@@ -31,6 +31,7 @@ def fallback_chromium_executable():
             "chromium-*/chrome-linux/chrome",
             "chrome-linux64/chrome",
             "chrome-linux/chrome",
+            "chrome",
         ),
     )
 

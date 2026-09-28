@@ -68,7 +68,8 @@ Playwright version. Upload the whole generated directory when possible. A
 complete `chromium-<revision>` directory is also sufficient: when the optional
 `chromium_headless_shell-<revision>` is not present, annas-api automatically
 launches the full Chromium executable in headless mode. It also supports a
-Chromium archive extracted directly into `playwright-browsers/chrome-linux64/`.
+Chromium archive extracted directly into `playwright-browsers/chrome-linux64/`,
+or its contents placed directly under `playwright-browsers/`.
 
 On startup the service validates that at least one compatible Chromium executable
 is available. Otherwise, `GET /healthz` returns `503` with an actionable message

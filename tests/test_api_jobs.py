@@ -47,7 +47,7 @@ class JobServiceTests(unittest.TestCase):
 
     def test_full_chromium_is_accepted_as_a_headless_fallback(self):
         browser_root = Path(self.folder.name) / "browsers"
-        executable = browser_root / "chrome-linux64" / "chrome"
+        executable = browser_root / "chrome"
         executable.parent.mkdir(parents=True)
         executable.write_text("#!/bin/sh\n")
         executable.chmod(executable.stat().st_mode | 0o111)

@@ -75,7 +75,8 @@ whole generated directory when possible. The service also accepts a complete
 `chromium-<revision>` directory on its own and uses its full Chromium executable
 when Playwright's optional `chromium_headless_shell-<revision>` is absent. The
 same fallback supports a Chromium archive extracted directly as
-`playwright-browsers/chrome-linux64/`.
+`playwright-browsers/chrome-linux64/`, or with its archive contents directly
+under `playwright-browsers/` (where the executable is `chrome`).
 service reports `/healthz` as `503` and rejects new browser jobs with a clear
 error only when neither executable is available.
 
