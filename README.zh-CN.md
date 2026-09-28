@@ -37,21 +37,20 @@ curl http://127.0.0.1:8000/healthz
 
 服务仅绑定 `127.0.0.1:8000`。交互式 OpenAPI 文档：<http://127.0.0.1:8000/docs>。
 
-### 可选：生产环境源码挂载
+### 生产环境更新
 
-默认部署把代码构建进镜像，适合可复现发布。若需要在同一台服务器上通过
-`git pull` 快速更新应用代码，可使用只读挂载覆盖配置：
+`compose.yaml` 默认将 `annas_api/` 以只读方式挂载到容器中，因此可以在同一台
+服务器上通过 `git pull` 快速更新应用代码：
 
 ```bash
-docker compose -f compose.yaml -f compose.mount.yaml up --build -d  # 首次
+docker compose up --build -d  # 首次
 git pull --ff-only
-docker compose -f compose.yaml -f compose.mount.yaml restart ferry-api
+docker compose restart ferry-api
 curl http://127.0.0.1:8000/healthz
 ```
 
-挂载只覆盖 `annas_api/`，数据仍保存在 `ferry-data` 卷中。`pyproject.toml`、
-依赖或 `Dockerfile` 变化时仍需带 `--build` 重建镜像；生产环境不要使用
-`--reload`。
+数据仍保存在 `ferry-data` 卷中。`pyproject.toml`、依赖或 `Dockerfile` 变化时
+仍需带 `--build` 重建镜像；生产环境不要使用 `--reload`。
 
 ## 用法
 
