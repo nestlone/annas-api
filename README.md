@@ -74,6 +74,8 @@ Do not mix files from Windows, macOS, or another Playwright version. Upload the
 whole generated directory when possible. The service also accepts a complete
 `chromium-<revision>` directory on its own and uses its full Chromium executable
 when Playwright's optional `chromium_headless_shell-<revision>` is absent. The
+same fallback supports a Chromium archive extracted directly as
+`playwright-browsers/chrome-linux64/`.
 service reports `/healthz` as `503` and rejects new browser jobs with a clear
 error only when neither executable is available.
 
