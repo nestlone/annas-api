@@ -34,9 +34,10 @@ console value wins afterwards. A registrant is always a regular user.
 | --- | --- |
 | **检索 (Search)** | Enter a query, optionally a format and a result count. Each hit has a Download button that queues the file and links it when ready. |
 | **我的任务 (My jobs)** | Recent jobs with status; queued jobs can be cancelled, completed downloads can be saved. |
-| **API 密钥 (API keys)** | Create and revoke keys. The secret is displayed **once** at creation — only its SHA-256 is stored, so it cannot be recovered later. |
+| **API 密钥 (API keys)** | Create, rename and revoke keys. The secret is displayed **once** at creation — only its SHA-256 is stored, so it cannot be recovered later. |
 | **我的额度 (My quota)** | Today's search and download counts against the limits, plus jobs currently running. |
-| **管理后台 (Admin)** | Registration toggle and the user table. |
+| **账户 (Account)** | Change your password. This signs every logged-in device out. |
+| **管理后台 (Admin)** | Registration toggle, user creation, account and role editing, password reset, quotas and usage controls. |
 
 ## API keys
 
@@ -49,6 +50,9 @@ curl -H "X-API-Key: fry_..." https://example.com/v1/jobs
 Keys carry their owner's identity. A regular user sees only their own jobs;
 `FERRY_API_TOKEN` and administrators see all of them. Revoking a key, or
 disabling its owner, takes effect on the next request.
+
+Key remarks are editable and never change the secret. To rotate a secret,
+create a new key, update its client, and then revoke the old one.
 
 ## Quotas
 
@@ -78,6 +82,11 @@ disabling a user, or deleting a user invalidates them immediately.
 Because authentication is cookie-based, the console is served from the same
 origin as the API it calls. Pointing a different domain at the same container
 requires that domain to be listed on the reverse proxy.
+
+Users can change their own password after confirming the current password.
+Administrators can reset another user's password. Either operation invalidates
+that user's browser sessions, so the user must sign in again. The console also
+prevents administrators from removing the last enabled administrator role.
 
 ## Security notes
 

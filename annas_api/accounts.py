@@ -298,6 +298,20 @@ class AccountStore:
         finally:
             connection.close()
 
+    def set_username(self, user_id, username):
+        """Rename a user, keeping existing sessions and keys attached."""
+        connection = self._connect()
+        try:
+            cursor = connection.execute(
+                "UPDATE users SET username = ?, updated_at = ? WHERE id = ?",
+                (username, int(time.time()), user_id),
+            )
+            return cursor.rowcount == 1
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("用户名已存在") from exc
+        finally:
+            connection.close()
+
     def set_password(self, user_id, password):
         connection = self._connect()
         try:
@@ -351,6 +365,17 @@ class AccountStore:
             cursor = connection.execute(
                 "UPDATE api_keys SET is_active = 0 WHERE id = ? AND user_id = ?",
                 (key_id, user_id),
+            )
+            return cursor.rowcount == 1
+        finally:
+            connection.close()
+
+    def rename_key(self, user_id, key_id, name):
+        connection = self._connect()
+        try:
+            cursor = connection.execute(
+                "UPDATE api_keys SET name = ? WHERE id = ? AND user_id = ?",
+                (name, key_id, user_id),
             )
             return cursor.rowcount == 1
         finally:
@@ -418,6 +443,14 @@ class AccountStore:
                 "DELETE FROM sessions WHERE token_hash = ?", (hash_session_token(raw),)
             )
             return cursor.rowcount == 1
+        finally:
+            connection.close()
+
+    def delete_user_sessions(self, user_id):
+        """Invalidate every browser session after a password or access change."""
+        connection = self._connect()
+        try:
+            connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
         finally:
             connection.close()
 

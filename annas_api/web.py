@@ -27,6 +27,15 @@ class KeyRequest(BaseModel):
     name: Optional[str] = Field(default=None, max_length=60)
 
 
+class KeyPatch(BaseModel):
+    name: str = Field(max_length=60)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
+
+
 class SettingsPatch(BaseModel):
     registration_open: Optional[bool] = None
 
@@ -38,6 +47,7 @@ class AdminUserCreate(BaseModel):
 
 
 class AdminUserPatch(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=1, max_length=64)
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
     password: Optional[str] = Field(default=None, min_length=1, max_length=200)
@@ -148,6 +158,13 @@ def create_web_router(settings, accounts):
     def list_keys(user=Depends(identity)):
         return {"keys": accounts.list_keys(user["id"])}
 
+    @router.patch("/keys/{key_id}")
+    def rename_key(key_id: int, body: KeyPatch, user=Depends(identity)):
+        name = body.name.strip()[:60]
+        if not accounts.rename_key(user["id"], key_id, name):
+            raise HTTPException(404, "密钥不存在")
+        return {"ok": True, "name": name}
+
     @router.post("/keys", status_code=201)
     def create_key(body: KeyRequest, user=Depends(identity)):
         if len(accounts.list_keys(user["id"])) >= MAX_KEYS_PER_USER:
@@ -166,6 +183,16 @@ def create_web_router(settings, accounts):
     @router.get("/usage")
     def usage(user=Depends(identity)):
         return {"quota": accounts.get_quota(user["id"]), "usage": accounts.usage(user["id"])}
+
+    @router.post("/password")
+    def change_password(body: PasswordChange, request: Request, user=Depends(identity)):
+        if accounts.authenticate(user["username"], body.current_password) is None:
+            raise HTTPException(401, "当前密码不正确")
+        accounts.set_password(user["id"], _clean_password(body.new_password))
+        accounts.delete_user_sessions(user["id"])
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        return response
 
     # ------------------------------------------------------------------ admin
 
@@ -203,16 +230,27 @@ def create_web_router(settings, accounts):
 
     @router.patch("/admin/users/{user_id}")
     def update_user(user_id: int, body: AdminUserPatch, caller=Depends(admin)):
-        if accounts.get_user(user_id) is None:
+        target = accounts.get_user(user_id)
+        if target is None:
             raise HTTPException(404, "用户不存在")
         if user_id == caller["id"] and body.is_active is False:
             raise HTTPException(409, "不能停用当前登录的账号")
+        if target["is_admin"] and body.is_active is False and accounts.count_admins() <= 1:
+            raise HTTPException(409, "至少需要保留一个启用的管理员")
+        if target["is_admin"] and body.is_admin is False and accounts.count_admins() <= 1:
+            raise HTTPException(409, "至少需要保留一个启用的管理员")
+        if body.username is not None:
+            try:
+                accounts.set_username(user_id, _clean_username(body.username))
+            except ValueError as exc:
+                raise HTTPException(409, str(exc)) from exc
         if body.is_active is not None:
             accounts.set_active(user_id, body.is_active)
         if body.is_admin is not None:
             accounts.set_admin(user_id, body.is_admin)
         if body.password:
             accounts.set_password(user_id, _clean_password(body.password))
+            accounts.delete_user_sessions(user_id)
         return accounts.get_user(user_id)
 
     @router.put("/admin/users/{user_id}/quota")
@@ -238,6 +276,9 @@ def create_web_router(settings, accounts):
     def delete_user(user_id: int, caller=Depends(admin)):
         if user_id == caller["id"]:
             raise HTTPException(409, "不能删除当前登录的账号")
+        target = accounts.get_user(user_id)
+        if target and target["is_admin"] and accounts.count_admins() <= 1:
+            raise HTTPException(409, "至少需要保留一个启用的管理员")
         if not accounts.delete_user(user_id):
             raise HTTPException(404, "用户不存在")
         return {"ok": True}

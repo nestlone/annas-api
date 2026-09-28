@@ -55,6 +55,30 @@ class WebAuthTests(unittest.TestCase):
             client.post("/web/logout")
             self.assertEqual(client.get("/web/me").status_code, 401)
 
+    def test_user_can_change_password_and_all_sessions_are_invalidated(self):
+        with self.make_client() as client:
+            client.post("/web/register", json={"username": "alice", "password": "password123"})
+            changed = client.post("/web/password", json={
+                "current_password": "password123", "new_password": "changed123",
+            })
+            self.assertEqual(changed.status_code, 200, changed.text)
+            self.assertEqual(client.get("/web/me").status_code, 401)
+            self.assertEqual(
+                client.post("/web/login", json={"username": "alice", "password": "password123"}).status_code,
+                401,
+            )
+            self.assertEqual(
+                client.post("/web/login", json={"username": "alice", "password": "changed123"}).status_code,
+                200,
+            )
+
+    def test_password_change_requires_the_current_password(self):
+        with self.make_client() as client:
+            client.post("/web/register", json={"username": "alice", "password": "password123"})
+            self.assertEqual(client.post("/web/password", json={
+                "current_password": "wrong-password", "new_password": "changed123",
+            }).status_code, 401)
+
     def test_registration_is_closed_by_default_once_an_admin_exists(self):
         with self.make_client(admin_password="adminpass123") as client:
             denied = client.post(
@@ -190,6 +214,16 @@ class ApiKeyAuthTests(unittest.TestCase):
             client.post("/web/logout")
             self.assertEqual(client.get("/v1/jobs", headers={"X-API-Key": raw}).status_code, 401)
 
+    def test_key_remarks_can_be_edited_without_rotating_the_secret(self):
+        with self.make_client(api_token=None, admin_password="adminpass123") as client:
+            client.post("/web/login", json={"username": "admin", "password": "adminpass123"})
+            created = client.post("/web/keys", json={"name": "old name"}).json()
+            response = client.patch(f"/web/keys/{created['id']}", json={"name": "production"})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(client.get("/web/keys").json()["keys"][0]["name"], "production")
+            client.post("/web/logout")
+            self.assertEqual(client.get("/v1/jobs", headers={"X-API-Key": created["key"]}).status_code, 200)
+
     def test_an_unknown_key_is_rejected(self):
         with self.make_client(api_token=None, admin_password="adminpass123") as client:
             self.assertEqual(
@@ -218,6 +252,26 @@ class ApiKeyAuthTests(unittest.TestCase):
                 client.post("/web/login", json={"username": "bob", "password": "password123"}).status_code,
                 401,
             )
+
+    def test_admin_can_rename_and_reset_another_user(self):
+        with self.make_client(api_token=None, admin_password="adminpass123") as client:
+            client.post("/web/login", json={"username": "admin", "password": "adminpass123"})
+            bob = client.post("/web/admin/users", json={"username": "bob", "password": "password123"}).json()
+            changed = client.patch(f"/web/admin/users/{bob['id']}", json={
+                "username": "robert", "password": "resetpass123",
+            })
+            self.assertEqual(changed.status_code, 200, changed.text)
+            self.assertEqual(changed.json()["username"], "robert")
+            client.post("/web/logout")
+            self.assertEqual(client.post("/web/login", json={"username": "bob", "password": "password123"}).status_code, 401)
+            self.assertEqual(client.post("/web/login", json={"username": "robert", "password": "resetpass123"}).status_code, 200)
+
+    def test_last_enabled_admin_cannot_be_demoted_or_deleted(self):
+        with self.make_client(api_token=None, admin_password="adminpass123") as client:
+            client.post("/web/login", json={"username": "admin", "password": "adminpass123"})
+            admin = client.get("/web/me").json()
+            self.assertEqual(client.patch(f"/web/admin/users/{admin['id']}", json={"is_admin": False}).status_code, 409)
+            self.assertEqual(client.patch(f"/web/admin/users/{admin['id']}", json={"is_active": False}).status_code, 409)
 
 
 class AdminGuardTests(unittest.TestCase):

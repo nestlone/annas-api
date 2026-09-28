@@ -34,6 +34,7 @@ const NAV_ICONS = {
   jobs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l4 4v14H4V3h4"></path><path d="M8 3v5h8V3M8 14h8M8 18h5"></path></svg>',
   keys: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="15.5" r="3.5"></circle><path d="m11 13 8.5-8.5M16 8l2 2M14 10l2 2"></path></svg>',
   usage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-8M22 19V3"></path></svg>',
+  account: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 21a6.5 6.5 0 0 1 13 0"></path></svg>',
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 21a6.5 6.5 0 0 1 13 0M19 8h3M20.5 6.5v3"></path></svg>',
 };
 
@@ -91,6 +92,7 @@ function renderChrome() {
     ["#/jobs", "我的任务", "jobs"],
     ["#/keys", "API 密钥", "keys"],
     ["#/usage", "我的额度", "usage"],
+    ["#/account", "账户", "account"],
   ];
   if (state.me.is_admin) links.push(["#/admin", "管理后台", "admin"]);
   const active = location.hash || "#/search";
@@ -348,10 +350,10 @@ async function loadKeys() {
   body.innerHTML =
     '<table><thead><tr><th>备注</th><th>前缀</th><th>创建时间</th><th>最近使用</th><th>状态</th><th></th></tr></thead><tbody>' +
     data.keys.map((key) =>
-      "<tr><td>" + esc(key.name || "-") + "</td><td><code>" + esc(key.key_prefix) + "…</code></td><td>" +
+      '<tr data-key="' + key.id + '"><td><input class="key-name" value="' + esc(key.name || "") + '" placeholder="未命名"></td><td><code>' + esc(key.key_prefix) + "…</code></td><td>" +
       esc(fmtTime(key.created_at)) + "</td><td>" + esc(fmtTime(key.last_used_at)) + "</td><td>" +
       (key.is_active ? "启用" : "已吊销") + '</td><td class="right">' +
-      (key.is_active ? '<button class="ghost" data-revoke="' + key.id + '">吊销</button>' : "") +
+      (key.is_active ? '<button class="ghost" data-save-name="' + key.id + '">保存</button> <button class="ghost" data-revoke="' + key.id + '">吊销</button>' : "") +
       "</td></tr>").join("") +
     "</tbody></table>";
   body.querySelectorAll("button[data-revoke]").forEach((button) => {
@@ -365,6 +367,46 @@ async function loadKeys() {
       }
     };
   });
+  body.querySelectorAll("button[data-save-name]").forEach((button) => {
+    button.onclick = async () => {
+      const row = button.closest("tr");
+      try {
+        await API.patch("/web/keys/" + button.dataset.saveName, { name: row.querySelector(".key-name").value });
+        toast("备注已保存", "ok");
+      } catch (error) { toast(error.message, "error"); }
+    };
+  });
+}
+
+/* ------------------------------------------------------------------ account */
+
+async function screenAccount() {
+  view().innerHTML =
+    '<div class="card narrow">' +
+    '<h1>账户安全</h1><p class="hint">修改密码后，所有已登录设备都会退出，需要使用新密码重新登录。</p>' +
+    '<form id="password-form">' +
+    field("当前密码", '<input name="currentPassword" type="password" autocomplete="current-password" required>') +
+    field("新密码", '<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required>') +
+    field("确认新密码", '<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>') +
+    '<button type="submit">更新密码</button></form></div>';
+  document.getElementById("password-form").onsubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    if (form.newPassword.value !== form.confirmPassword.value) {
+      toast("两次输入的新密码不一致", "error");
+      return;
+    }
+    try {
+      await API.post("/web/password", {
+        current_password: form.currentPassword.value,
+        new_password: form.newPassword.value,
+      });
+      state.me = null;
+      location.hash = "";
+      toast("密码已更新，请重新登录", "ok");
+      boot();
+    } catch (error) { toast(error.message, "error"); }
+  };
 }
 
 /* ------------------------------------------------------------------ usage */
@@ -453,8 +495,8 @@ async function loadUsers() {
       const usage = user.usage || {};
       return (
         '<tr data-user="' + user.id + '">' +
-        "<td>" + esc(user.username) + "</td>" +
-        "<td>" + (user.is_admin ? "管理员" : "用户") + "</td>" +
+        '<td><input class="tiny user-name" value="' + esc(user.username) + '" aria-label="用户名"></td>' +
+        '<td><label class="switch"><input type="checkbox" data-admin ' + (user.is_admin ? "checked" : "") + '> 管理员</label></td>' +
         "<td>" + (user.is_active ? "启用" : "停用") + "</td>" +
         "<td>" + (usage.searches || 0) + "</td>" +
         "<td>" + (usage.downloads || 0) + "</td>" +
@@ -462,8 +504,11 @@ async function loadUsers() {
         '<td><input class="tiny" data-quota="daily_downloads" type="number" min="0" value="' + (quota.daily_downloads || 0) + '"></td>' +
         '<td><input class="tiny" data-quota="max_concurrent_jobs" type="number" min="0" value="' + (quota.max_concurrent_jobs || 0) + '"></td>' +
         '<td class="right nowrap">' +
+        '<button class="ghost" data-save-user>保存账户</button> ' +
         '<button class="ghost" data-save>保存额度</button> ' +
         '<button class="ghost" data-toggle>' + (user.is_active ? "停用" : "启用") + "</button> " +
+        '<input class="tiny reset-password" type="password" placeholder="新密码" aria-label="重置密码"> ' +
+        '<button class="ghost" data-reset-password>重置密码</button> ' +
         '<button class="ghost" data-reset>重置用量</button> ' +
         '<button class="ghost danger" data-delete>删除</button>' +
         "</td></tr>"
@@ -487,6 +532,16 @@ async function loadUsers() {
         toast("额度已保存", "ok");
       } catch (error) { toast(error.message, "error"); }
     };
+    row.querySelector("[data-save-user]").onclick = async () => {
+      try {
+        await API.patch("/web/admin/users/" + userId, {
+          username: row.querySelector(".user-name").value,
+          is_admin: row.querySelector("[data-admin]").checked,
+        });
+        toast("账户已保存", "ok");
+        loadUsers();
+      } catch (error) { toast(error.message, "error"); }
+    };
     row.querySelector("[data-toggle]").onclick = async () => {
       const active = row.children[2].textContent === "启用";
       try {
@@ -499,6 +554,15 @@ async function loadUsers() {
         await API.post("/web/admin/users/" + userId + "/usage/reset");
         toast("用量已重置", "ok");
         loadUsers();
+      } catch (error) { toast(error.message, "error"); }
+    };
+    row.querySelector("[data-reset-password]").onclick = async () => {
+      const password = row.querySelector(".reset-password").value;
+      if (!password) { toast("请输入新密码", "error"); return; }
+      try {
+        await API.patch("/web/admin/users/" + userId, { password: password });
+        toast("密码已重置；该用户需要重新登录", "ok");
+        row.querySelector(".reset-password").value = "";
       } catch (error) { toast(error.message, "error"); }
     };
     row.querySelector("[data-delete]").onclick = async () => {
@@ -519,6 +583,7 @@ const ROUTES = {
   "#/jobs": screenJobs,
   "#/keys": screenKeys,
   "#/usage": screenUsage,
+  "#/account": screenAccount,
   "#/admin": screenAdmin,
 };
 
