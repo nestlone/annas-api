@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "annas-api"
+version = "0.0.1"
+description = "Asynchronous API and CLI for verified document retrieval workflows"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "nestlone", email = "nestlone@mail.nestlone.com" }
+]
+keywords = [
+    "annas-archive",
+    "asynchronous-api",
+    "fastapi",
+    "document-verification",
+    "djvu-to-pdf",
+    "docker",
+    "cli"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Utilities"
+]
+dependencies = [
+    "requests>=2.28.0",
+    "playwright>=1.40.0",
+    "ddddocr>=1.4.7",
+    "PyMuPDF>=1.23.0",
+    "beautifulsoup4>=4.11.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+]
+
+[project.optional-dependencies]
+# httpx backs fastapi.testclient, which the offline API tests import.
+dev = [
+    "httpx>=0.23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nestlone/annas-api"
+Repository = "https://github.com/nestlone/annas-api.git"
+Issues = "https://github.com/nestlone/annas-api/issues"
+
+[project.scripts]
+annas-api = "annas_api.engine:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["annas_api*"]

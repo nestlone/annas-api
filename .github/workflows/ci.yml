@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }} - Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Validate Python syntax & compilation
+        run: |
+          python -m compileall -q annas_api tests
+
+      - name: Verify Full Module Imports (Catch Missing Dependencies)
+        run: |
+          python -c "import annas_api; from bs4 import BeautifulSoup; import fitz; import ddddocr; import requests; print('All core modules imported successfully')"
+
+      - name: Test CLI interface and subcommands
+        run: |
+          annas-api --help
+          annas-api search --help
+          annas-api probe --help
+          annas-api download --help
+
+      - name: Test download validation and resume
+        run: python -m unittest discover -s tests -v

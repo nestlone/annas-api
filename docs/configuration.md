@@ -1,0 +1,85 @@
+# Configuration
+
+## Service (Docker)
+
+```bash
+cp .env.example .env
+```
+
+`.env` is git-ignored; keep it in a protected location.
+
+```ini
+FERRY_API_TOKEN=replace-with-a-long-random-api-token
+FERRY_API_SIGNING_KEY=replace-with-a-different-long-random-signing-key
+FERRY_API_WORKERS=8
+FERRY_API_FILE_URL_TTL=900
+```
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `FERRY_API_TOKEN` | yes | — | `X-API-Key` for management endpoints. |
+| `FERRY_API_SIGNING_KEY` | yes | — | HMAC key for download URLs; must differ from the token. |
+| `FERRY_API_WORKERS` | no | `2` | Local worker count, clamped to 1–10. |
+| `FERRY_API_FILE_URL_TTL` | no | `900` | Download-link lifetime, clamped to 60–86400 seconds. |
+| `FERRY_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
+| `FERRY_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
+
+Each worker starts its own browser process, so memory grows with the worker count;
+keep it at or below 8 on a 2 GB host. Recreate the container after changes:
+`docker compose up -d`.
+
+## Container permissions
+
+The image runs as `root`, which owns the app directory, the `/data` volume, and
+`/ms-playwright`. For a non-root deployment, adjust the UID/GID of the volume and
+browser directory accordingly.
+
+## CLI
+
+The CLI reads optional settings from `~/.annas_ferry/config.json`, falling back to
+built-in defaults:
+
+```json
+{
+  "proxy": "auto",
+  "proxy_bypass_hosts": ["annas-archive.gl"],
+  "default_download_dir": "~/Downloads/AnnasFerry",
+  "auto_convert_djvu": true,
+  "headless": true
+}
+```
+
+Hosts in `proxy_bypass_hosts` (and their subdomains) are reached directly. This
+affects application-level HTTP/SOCKS proxies only; a global VPN or TUN still
+intercepts traffic at the OS layer.
+
+### Rotating proxy pool
+
+With `FERRY_PROXY_POOL_URL` set, **CDN downloads** egress through pool IPs. The
+browser (search and direct-link scraping) stays direct by default, because pool IPs
+are usually rejected by the mirror's DDoS-Guard challenge. The endpoint returns
+plain text (`wt=text`, `method=http`) such as `1.2.3.4:8080`, parsed as
+`http://1.2.3.4:8080`.
+
+```ini
+FERRY_PROXY_POOL_URL=https://api.example.com/ip/get?appKey=KEY&appSecret=SECRET&cnt=&wt=text&method=http
+```
+
+- Each acquisition returns a different exit IP; a single download keeps one IP and
+  rotates (resuming) on `429`, gateway, or connection errors, up to 3 retries.
+- To send the browser through the pool too, set `"proxy_pool_browser": true` in the
+  CLI config (default `false`). Do not enable it if the pool fails the challenge.
+- The URL carries credentials, so it lives only in `.env`; `save_dynamic_config()`
+  never writes it to disk.
+- `proxy_pool_scheme` (default `http`) overrides the scheme prefix. Clearing the
+  variable returns to direct/auto behaviour.
+
+## Data retention
+
+The `ferry-data` volume holds:
+
+- `/data/jobs.sqlite3` — job state and error summaries.
+- `/data/downloads/` — validated, delivered files.
+
+Production deployments should define expiry, quota, backup, and access policies.
+`docker compose down -v` deletes the volume and all its data.
