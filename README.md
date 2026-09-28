@@ -39,6 +39,11 @@ docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
 
+Docker builds use the Tsinghua PyPI mirror by default to improve dependency
+downloads from mainland China. Set `ANNAS_API_PIP_INDEX_URL` in `.env` before
+rebuilding to use another index. This setting affects Python dependencies only;
+slow Playwright/Chromium downloads require separate network troubleshooting.
+
 Then open `http://127.0.0.1:8000/` for the web console and log in with
 `ANNAS_API_ADMIN_USERNAME` / `ANNAS_API_ADMIN_PASSWORD` — see [Web console](docs/web.md).
 

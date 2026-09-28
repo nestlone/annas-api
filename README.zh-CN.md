@@ -36,6 +36,10 @@ docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
 
+Docker 构建默认通过清华 PyPI 镜像安装 Python 依赖，以改善中国大陆网络下的构建速度。
+如需使用其他镜像，可在 `.env` 中设置 `ANNAS_API_PIP_INDEX_URL` 后重新构建。
+该设置只影响 Python 依赖；Playwright/Chromium 下载较慢时需单独检查网络。
+
 随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `ANNAS_API_ADMIN_USERNAME` /
 `ANNAS_API_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
 

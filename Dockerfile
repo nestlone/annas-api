@@ -1,8 +1,11 @@
 FROM python:3.11-slim
 
+ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     ANNAS_API_DATA_DIR=/data \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
