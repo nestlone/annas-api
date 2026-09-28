@@ -29,6 +29,14 @@ const API = {
 
 const state = { me: null, settings: null };
 
+const NAV_ICONS = {
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m16 16 4.2 4.2"></path></svg>',
+  jobs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l4 4v14H4V3h4"></path><path d="M8 3v5h8V3M8 14h8M8 18h5"></path></svg>',
+  keys: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="15.5" r="3.5"></circle><path d="m11 13 8.5-8.5M16 8l2 2M14 10l2 2"></path></svg>',
+  usage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-8M22 19V3"></path></svg>',
+  admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 21a6.5 6.5 0 0 1 13 0M19 8h3M20.5 6.5v3"></path></svg>',
+};
+
 const view = () => document.getElementById("view");
 const esc = (value) =>
   String(value === null || value === undefined ? "" : value).replace(
@@ -79,16 +87,16 @@ function renderChrome() {
     return;
   }
   const links = [
-    ["#/search", "检索"],
-    ["#/jobs", "我的任务"],
-    ["#/keys", "API 密钥"],
-    ["#/usage", "我的额度"],
+    ["#/search", "检索", "search"],
+    ["#/jobs", "我的任务", "jobs"],
+    ["#/keys", "API 密钥", "keys"],
+    ["#/usage", "我的额度", "usage"],
   ];
-  if (state.me.is_admin) links.push(["#/admin", "管理后台"]);
+  if (state.me.is_admin) links.push(["#/admin", "管理后台", "admin"]);
   const active = location.hash || "#/search";
   nav.innerHTML = links
-    .map(([href, label]) =>
-      '<a href="' + href + '" class="' + (active === href ? "active" : "") + '">' + esc(label) + "</a>")
+    .map(([href, label, icon]) =>
+      '<a href="' + href + '" class="' + (active === href ? "active" : "") + '">' + NAV_ICONS[icon] + '<span>' + esc(label) + "</span></a>")
     .join("");
   account.innerHTML =
     '<span class="who">' + esc(state.me.username) + (state.me.is_admin ? " · 管理员" : "") + "</span>" +
@@ -224,7 +232,7 @@ function renderSearchResults(hits) {
     hits.map((hit, index) =>
       "<tr><td>" + esc(hit.title || hit.md5) + "</td><td>" + esc(hit.format || "-") +
       "</td><td>" + esc(hit.size || "-") + '</td><td class="right"><button data-index="' + index +
-      '" class="ghost">下载</button></td></tr>").join("") +
+      '" class="ghost">下载</button></td></tr>').join("") +
     "</tbody></table>";
   node.querySelectorAll("button[data-index]").forEach((button) => {
     button.onclick = () => startDownload(hits[Number(button.dataset.index)], button);
