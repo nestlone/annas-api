@@ -2,13 +2,13 @@
 
 import json
 import shutil
-import sqlite3
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from . import db
 from .downloader import validate_md5, validate_public_https
 from .engine import download_book, search_books
 
@@ -26,6 +26,9 @@ class JobService:
         self.download_dir = self.data_dir / "downloads"
         self.database = self.data_dir / "jobs.sqlite3"
         self.retention_seconds = retention_seconds
+        # Assigned by create_app once the account store exists; None disables
+        # quota enforcement entirely (anonymous / single-token deployments).
+        self.quota = None
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ferry-job")
         self._futures = {}
@@ -38,28 +41,12 @@ class JobService:
         self._sweeper.start()
 
     def _connect(self):
-        connection = sqlite3.connect(str(self.database), timeout=30)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return db.connect(self.database)
 
     def _initialize(self):
         connection = self._connect()
         try:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS jobs (
-                    id TEXT PRIMARY KEY,
-                    kind TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    result_json TEXT,
-                    file_path TEXT,
-                    error TEXT,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                )
-                """
-            )
+            db.migrate(connection)
             # Work cannot safely resume after a process restart because an in-memory
             # future no longer exists. Preserve the row and make this explicit.
             connection.execute(
@@ -67,7 +54,6 @@ class JobService:
                 "WHERE status IN ('queued', 'running')",
                 ("服务重启前任务未完成；请重新提交。", int(time.time())),
             )
-            connection.commit()
         finally:
             connection.close()
 
@@ -122,33 +108,49 @@ class JobService:
             connection.close()
         return len(expired)
 
-    def submit_search(self, query, ext=None, limit=10):
+    def submit_search(self, query, ext=None, limit=10, owner_id=None):
         if not query or not query.strip():
             raise ValueError("检索关键词不能为空")
         if not 1 <= limit <= 50:
             raise ValueError("limit 必须在 1 到 50 之间")
-        return self._submit("search", {"query": query.strip(), "ext": ext, "limit": limit})
+        return self._submit(
+            "search", {"query": query.strip(), "ext": ext, "limit": limit}, owner_id=owner_id
+        )
 
-    def submit_download(self, md5=None, direct_url=None, name=None):
+    def submit_download(self, md5=None, direct_url=None, name=None, owner_id=None):
         if bool(md5) == bool(direct_url):
             raise ValueError("必须且只能提供 md5 或 direct_url")
         if md5:
             validate_md5(md5)
         if direct_url:
             validate_public_https(direct_url)
-        return self._submit("download", {"md5": md5, "direct_url": direct_url, "name": name})
+        return self._submit(
+            "download",
+            {"md5": md5, "direct_url": direct_url, "name": name},
+            owner_id=owner_id,
+        )
 
-    def _submit(self, kind, payload):
+    def _submit(self, kind, payload, owner_id=None):
         job_id = uuid.uuid4().hex
         now = int(time.time())
         connection = self._connect()
         try:
-            connection.execute(
-                "INSERT INTO jobs (id, kind, status, payload_json, created_at, updated_at) "
-                "VALUES (?, ?, 'queued', ?, ?, ?)",
-                (job_id, kind, json.dumps(payload, ensure_ascii=False), now, now),
-            )
-            connection.commit()
+            # The write lock is taken before the quota check so the check and the
+            # insert below cannot interleave with a competing submit; two requests
+            # can never both pass the same limit.
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                if self.quota is not None:
+                    self.quota.reserve(connection, owner_id, kind)
+                connection.execute(
+                    "INSERT INTO jobs (id, kind, status, payload_json, owner_id, created_at, updated_at) "
+                    "VALUES (?, ?, 'queued', ?, ?, ?, ?)",
+                    (job_id, kind, json.dumps(payload, ensure_ascii=False), owner_id, now, now),
+                )
+                connection.execute("COMMIT")
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
         finally:
             connection.close()
         future = self._executor.submit(self._run, job_id)
@@ -263,8 +265,12 @@ class JobService:
             return "not_found"
         return "running" if job["status"] == "running" else "terminal"
 
-    def list_jobs(self, status=None, limit=50, offset=0):
-        """List jobs newest-first, optionally filtered by status."""
+    def list_jobs(self, status=None, limit=50, offset=0, owner_id=None):
+        """List jobs newest-first, optionally filtered by status and owner.
+
+        ``owner_id`` None applies no ownership filter, which is what the system
+        token and administrators want.
+        """
         if status is not None and status not in KNOWN_STATUSES:
             raise ValueError("status 必须是 queued、running、completed、failed 或 cancelled 之一")
         if not 1 <= limit <= 100:
@@ -272,13 +278,20 @@ class JobService:
         if offset < 0:
             raise ValueError("offset 不能为负数")
 
+        conditions = []
+        params = []
+        if status is not None:
+            conditions.append("status = ?")
+            params.append(status)
+        if owner_id is not None:
+            conditions.append("owner_id = ?")
+            params.append(owner_id)
+
         # result_json/payload_json are intentionally excluded: a page of search
         # results would dwarf the queue view.
         sql = "SELECT id, kind, status, file_path, error, created_at, updated_at FROM jobs"
-        params = []
-        if status is not None:
-            sql += " WHERE status = ?"
-            params.append(status)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
         # created_at only has second resolution, so rowid breaks ties and keeps
         # pagination from repeating or skipping rows.
         sql += " ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?"
@@ -290,6 +303,17 @@ class JobService:
         finally:
             connection.close()
         return [dict(row) for row in rows]
+
+    def count_active(self, owner_id):
+        """Number of queued or running jobs owned by ``owner_id``."""
+        connection = self._connect()
+        try:
+            return connection.execute(
+                "SELECT COUNT(*) AS n FROM jobs WHERE owner_id = ? AND status IN ('queued', 'running')",
+                (owner_id,),
+            ).fetchone()["n"]
+        finally:
+            connection.close()
 
     def get(self, job_id, include_payload=False):
         connection = self._connect()

@@ -19,6 +19,7 @@
 - **断点续传** —— 中断的下载按字节范围续传。
 - **代理分流** —— 可选让 CDN 下载经由轮换代理池出网。
 - **受控并发** —— 本地 Worker 池（1–10）配合 FIFO 排队。
+- **Web 控制台** —— 内置网页：用户级 API 密钥、在线检索与下载、额度查看，以及管理员对注册开关与用户的管理。
 - **一键部署** —— Docker Compose；密钥存放于未纳入 Git 的 `.env`。
 
 ## 快速开始
@@ -26,10 +27,13 @@
 需要 Docker 与 Compose 插件。
 
 ```bash
-cp .env.example .env   # 设置 FERRY_API_TOKEN 与 FERRY_API_SIGNING_KEY
+cp .env.example .env   # 设置 FERRY_API_TOKEN、FERRY_API_SIGNING_KEY 与 FERRY_ADMIN_PASSWORD
 docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
+
+随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `FERRY_ADMIN_USERNAME` /
+`FERRY_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
 
 服务仅绑定 `127.0.0.1:8000`。交互式 OpenAPI 文档：<http://127.0.0.1:8000/docs>。
 
@@ -62,6 +66,10 @@ curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
 | `FERRY_API_FILE_URL_TTL` | `900` | 下载链接有效秒数（60–86400）。 |
 | `FERRY_API_FILE_RETENTION_HOURS` | `24` | 任务完成后文件与记录的保留小时数（1–8760）。 |
 | `FERRY_API_PUBLIC_BASE_URL` | — | `status_url`/`download_url` 的基地址；反向代理改写 `Host` 时需设置。 |
+| `FERRY_ADMIN_USERNAME` | `admin` | 控制台管理员账号，首次启动时创建。 |
+| `FERRY_ADMIN_PASSWORD` | — | 该管理员的初始密码；不设置则由第一个注册者成为管理员。 |
+| `FERRY_REGISTRATION_OPEN` | `0` | 是否开放注册的初始值。 |
+| `FERRY_SESSION_TTL_HOURS` | `168` | 控制台会话有效期。 |
 | `FERRY_PROXY_POOL_URL` | — | 可选的轮换代理池地址，用于 CDN 下载。 |
 
 详见[配置](docs/configuration.md)。

@@ -15,6 +15,10 @@ FERRY_API_WORKERS=8
 FERRY_API_FILE_URL_TTL=900
 FERRY_API_FILE_RETENTION_HOURS=24
 FERRY_API_PUBLIC_BASE_URL=https://annas.nestlone.com
+FERRY_ADMIN_USERNAME=admin
+FERRY_ADMIN_PASSWORD=replace-with-a-strong-password
+FERRY_REGISTRATION_OPEN=0
+FERRY_SESSION_TTL_HOURS=168
 ```
 
 | Variable | Required | Default | Description |
@@ -26,11 +30,36 @@ FERRY_API_PUBLIC_BASE_URL=https://annas.nestlone.com
 | `FERRY_API_FILE_RETENTION_HOURS` | no | `24` | Hours a finished job and its file survive, clamped to 1–8760. |
 | `FERRY_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
 | `FERRY_API_PUBLIC_BASE_URL` | no | — | Base URL for the `status_url` and `download_url` links. Set it when the service sits behind a reverse proxy that does not forward the original `Host` header; unset, links are derived from the request. |
+| `FERRY_ADMIN_USERNAME` | no | `admin` | Console administrator, created on first start. |
+| `FERRY_ADMIN_PASSWORD` | no | — | Initial password for that administrator. Only *seeds* the account: a password changed in the console is not reverted on restart. Without it, the first account to register becomes the administrator. |
+| `FERRY_REGISTRATION_OPEN` | no | `0` | Seeds whether the console offers open registration. The administrator owns the setting afterwards. |
+| `FERRY_SESSION_TTL_HOURS` | no | `168` | Console session lifetime, clamped to 1–8760. |
+| `FERRY_TOKEN_USERNAME` | no | `api-token` | Account that `FERRY_API_TOKEN` is registered under. |
+| `FERRY_SESSION_SECURE` | no | HTTPS base URL | Force the `Secure` flag on the session cookie. |
 | `FERRY_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
 
 Each worker starts its own browser process, so memory grows with the worker count;
 keep it at or below 8 on a 2 GB host. Recreate the container after changes:
 `docker compose up -d`.
+
+## Accounts and the web console
+
+The service serves a console at `/` with per-user API keys, online search and
+download, and an administrator view for registration and quotas. Accounts, keys,
+sessions, quotas and usage counters live in the same SQLite file as the jobs
+(`/data/jobs.sqlite3`), opened in WAL mode so console writes and worker writes do
+not block each other.
+
+`FERRY_API_TOKEN` keeps working unchanged: on every start it is registered as an
+administrator key, so existing API clients and the bundled agent skill need no
+change. Jobs created before accounts existed have no owner and are visible only
+to administrators.
+
+Quotas are per user and per UTC day: `daily_searches` and `daily_downloads` are
+counted separately, and `max_concurrent_jobs` caps parallel work. Zero means
+unlimited, and a submit that would exceed a limit is rejected with `429`.
+
+See [Web console](web.md) for the user and operator guide.
 
 ## Container permissions
 

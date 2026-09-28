@@ -29,7 +29,16 @@ git diff --check
 ```
 
 Coverage includes URL guarding, resume, integrity, JSON output, background jobs,
-authentication, and per-job directory isolation.
+authentication, accounts and quotas, and per-job directory isolation.
+
+Two conventions matter when adding tests:
+
+- `tests/_fixtures.py` builds a `fake_settings(...)` namespace covering every
+  attribute of `Settings`, so a new setting must be added there too.
+- A job executes in a worker thread, so `patch("annas_api.jobs.search_books", …)`
+  (or `download_book`) must stay active until the queue drains — patching only
+  around the HTTP call lets the real scraper run afterwards. `tests/test_quota.py`
+  shows the shape.
 
 ## Commits
 

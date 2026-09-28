@@ -10,9 +10,19 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .accounts import AccountStore, QuotaExceeded
 from .jobs import JobService
+from .web import SESSION_COOKIE, create_web_router, static_dir
+
+
+def _env_flag(name, default=False):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
 class Settings:
@@ -25,6 +35,30 @@ class Settings:
         self.public_base_url = (os.environ.get("FERRY_API_PUBLIC_BASE_URL") or "").rstrip("/")
         retention_hours = max(1, min(int(os.environ.get("FERRY_API_FILE_RETENTION_HOURS", "24")), 8760))
         self.retention_seconds = retention_hours * 3600
+        self.admin_username = os.environ.get("FERRY_ADMIN_USERNAME", "admin")
+        self.admin_password = os.environ.get("FERRY_ADMIN_PASSWORD")
+        self.token_username = os.environ.get("FERRY_TOKEN_USERNAME", "api-token")
+        self.registration_open = _env_flag("FERRY_REGISTRATION_OPEN", False)
+        session_hours = max(1, min(int(os.environ.get("FERRY_SESSION_TTL_HOURS", "168")), 8760))
+        self.session_ttl_seconds = session_hours * 3600
+        # Cookies are marked Secure whenever the service is reached over HTTPS.
+        self.session_secure = _env_flag(
+            "FERRY_SESSION_SECURE", self.public_base_url.startswith("https://")
+        )
+
+
+class Identity:
+    """Who is calling: an account, or the anonymous caller of an open deployment."""
+
+    def __init__(self, user_id=None, username=None, is_admin=False):
+        self.id = user_id
+        self.username = username
+        self.is_admin = is_admin
+
+    def can_see(self, job):
+        if self.is_admin:
+            return True
+        return job.get("owner_id") == self.id
 
 
 class SearchRequest(BaseModel):
@@ -41,20 +75,50 @@ class DownloadRequest(BaseModel):
 
 def create_app(settings=None):
     settings = settings or Settings()
+    accounts = AccountStore(
+        settings.data_dir,
+        session_ttl_seconds=getattr(settings, "session_ttl_seconds", 168 * 3600),
+    )
 
     @asynccontextmanager
     async def lifespan(app):
-        app.state.jobs = JobService(
+        jobs = JobService(
             settings.data_dir, settings.workers, retention_seconds=settings.retention_seconds
         )
+        accounts.migrate()
+        accounts.bootstrap_admin(
+            getattr(settings, "admin_username", "admin"), getattr(settings, "admin_password", None)
+        )
+        accounts.ensure_env_token(settings.api_token, getattr(settings, "token_username", "api-token"))
+        # The environment only seeds the toggle; the console owns it afterwards.
+        if accounts.get_setting("registration_open") is None:
+            accounts.set_registration_open(getattr(settings, "registration_open", False))
+        jobs.quota = accounts
+        app.state.jobs = jobs
+        app.state.accounts = accounts
         yield
-        app.state.jobs.close()
+        jobs.close()
 
     app = FastAPI(title="annas-api", version="0.0.1", lifespan=lifespan)
 
-    def require_token(x_api_key: Optional[str] = Header(default=None)):
-        if settings.api_token and not hmac.compare_digest(x_api_key or "", settings.api_token):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的 API 密钥")
+    def identity(request: Request, x_api_key: Optional[str] = Header(default=None)):
+        store = request.app.state.accounts
+        if x_api_key:
+            user = store.lookup_key(x_api_key)
+            if user is None:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的 API 密钥")
+            return Identity(user["id"], user["username"], user["is_admin"])
+        session = request.cookies.get(SESSION_COOKIE)
+        if session:
+            user = store.resolve_session(session)
+            if user is None:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已失效，请重新登录")
+            return Identity(user["id"], user["username"], user["is_admin"])
+        # A deployment that never configured a token and has no accounts stays open,
+        # matching the behaviour before accounts existed.
+        if settings.api_token is None and store.count_users() == 0:
+            return Identity()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="缺少 API 密钥")
 
     def service(request: Request):
         return request.app.state.jobs
@@ -105,46 +169,63 @@ def create_app(settings=None):
     def health():
         return {"status": "ok"}
 
-    @app.post("/v1/search", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_token)])
-    def submit_search(body: SearchRequest, request: Request, jobs=Depends(service)):
+    @app.post("/v1/search", status_code=status.HTTP_202_ACCEPTED)
+    def submit_search(
+        body: SearchRequest, request: Request, caller=Depends(identity), jobs=Depends(service)
+    ):
         try:
-            job_id = jobs.submit_search(body.query, body.ext, body.limit)
+            job_id = jobs.submit_search(body.query, body.ext, body.limit, owner_id=caller.id)
+        except QuotaExceeded as exc:
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}
 
-    @app.post("/v1/downloads", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_token)])
-    def submit_download(body: DownloadRequest, request: Request, jobs=Depends(service)):
+    @app.post("/v1/downloads", status_code=status.HTTP_202_ACCEPTED)
+    def submit_download(
+        body: DownloadRequest, request: Request, caller=Depends(identity), jobs=Depends(service)
+    ):
         try:
-            job_id = jobs.submit_download(body.md5, body.direct_url, body.name)
+            job_id = jobs.submit_download(
+                body.md5, body.direct_url, body.name, owner_id=caller.id
+            )
+        except QuotaExceeded as exc:
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}
 
-    @app.get("/v1/jobs", dependencies=[Depends(require_token)])
+    @app.get("/v1/jobs")
     def list_jobs(
         request: Request,
+        caller=Depends(identity),
         jobs=Depends(service),
         status: Optional[str] = Query(default=None),
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
     ):
         try:
-            rows = jobs.list_jobs(status=status, limit=limit, offset=offset)
+            rows = jobs.list_jobs(
+                status=status, limit=limit, offset=offset,
+                owner_id=None if caller.is_admin else caller.id,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         items = [job_summary(request, row) for row in rows]
         return {"jobs": items, "count": len(items), "limit": limit, "offset": offset}
 
-    @app.get("/v1/jobs/{job_id}", dependencies=[Depends(require_token)])
-    def get_job(job_id: str, request: Request, jobs=Depends(service)):
+    @app.get("/v1/jobs/{job_id}")
+    def get_job(job_id: str, request: Request, caller=Depends(identity), jobs=Depends(service)):
         job = jobs.get(job_id)
-        if not job:
+        if not job or not caller.can_see(job):
             raise HTTPException(status_code=404, detail="任务不存在")
         return job_response(request, job)
 
-    @app.post("/v1/jobs/{job_id}/cancel", dependencies=[Depends(require_token)])
-    def cancel_job(job_id: str, request: Request, jobs=Depends(service)):
+    @app.post("/v1/jobs/{job_id}/cancel")
+    def cancel_job(job_id: str, request: Request, caller=Depends(identity), jobs=Depends(service)):
+        job = jobs.get(job_id)
+        if not job or not caller.can_see(job):
+            raise HTTPException(status_code=404, detail="任务不存在")
         outcome = jobs.cancel(job_id)
         if outcome == "not_found":
             raise HTTPException(status_code=404, detail="任务不存在")
@@ -164,6 +245,13 @@ def create_app(settings=None):
         if not file_path:
             raise HTTPException(status_code=404, detail="文件不存在或任务未完成")
         return FileResponse(str(file_path), filename=file_path.name, media_type="application/octet-stream")
+
+    app.include_router(create_web_router(settings, accounts))
+    app.mount("/static", StaticFiles(directory=str(static_dir())), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def console():
+        return FileResponse(str(static_dir() / "index.html"))
 
     return app
 

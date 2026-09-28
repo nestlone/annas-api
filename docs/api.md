@@ -8,6 +8,12 @@ Every endpoint except `GET /healthz` and the signed file endpoint requires an AP
 X-API-Key: <FERRY_API_TOKEN>
 ```
 
+`FERRY_API_TOKEN` is one such key. Per-user keys are issued from the web console
+and behave identically — except that a regular user's key only reaches that
+user's own jobs, while `FERRY_API_TOKEN` and console administrators see every
+job. `GET /v1/jobs`, `GET /v1/jobs/{id}` and `POST /v1/jobs/{id}/cancel` return
+`404` for a job the caller does not own, so existence is not revealed.
+
 ## Health
 
 `GET /healthz` → `{"status":"ok"}`
@@ -127,6 +133,7 @@ Cancels a job that has not started. A `running` job cannot be interrupted.
 | `404` | Unknown job, file, or delivery state. |
 | `409` | Job is running or finished; cannot cancel. |
 | `422` | Invalid field, MD5, URL, or parameter. |
+| `429` | The user's quota is exhausted (daily searches/downloads, or too many jobs running). |
 | `500` | Unexpected server error. |
 
 ## Example
@@ -139,3 +146,32 @@ curl -X POST http://127.0.0.1:8000/v1/search \
 curl -H "X-API-Key: $TOKEN" 'http://127.0.0.1:8000/v1/jobs?status=queued&limit=50'
 curl -X POST -H "X-API-Key: $TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>/cancel
 ```
+
+## Web console endpoints
+
+The console is a static page served at `/`, backed by these JSON endpoints.
+Authentication is a `ferry_session` cookie (HttpOnly, SameSite=Lax), set by
+login and cleared by logout; none of them accept `X-API-Key`.
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/web/settings` | none | `{setup_required, registration_open, min_password_length}`. |
+| `POST` | `/web/register` | none, gated by `registration_open` | Create an account and log in. The first account of an empty database becomes the administrator. |
+| `POST` | `/web/login` | none | Log in, setting the session cookie. |
+| `POST` | `/web/logout` | session | Delete the session. |
+| `GET` | `/web/me` | session | Current account with quota and today's usage. |
+| `GET` | `/web/keys` | session | List own keys (prefix, name, timestamps). |
+| `POST` | `/web/keys` | session | Create a key; the secret is returned **once**. |
+| `POST` | `/web/keys/{id}/revoke` | session | Deactivate one of your keys. |
+| `GET` | `/web/usage` | session | `{quota, usage}` for the caller. |
+| `GET` | `/web/admin/settings` | admin | Registration toggle and user count. |
+| `PATCH` | `/web/admin/settings` | admin | `{registration_open}`. |
+| `GET` | `/web/admin/users` | admin | Users with quota and today's usage, paginated. |
+| `POST` | `/web/admin/users` | admin | Create a user. |
+| `PATCH` | `/web/admin/users/{id}` | admin | `{is_active?, is_admin?, password?}`. |
+| `PUT` | `/web/admin/users/{id}/quota` | admin | `{daily_searches, daily_downloads, max_concurrent_jobs}`; `0` is unlimited. |
+| `POST` | `/web/admin/users/{id}/usage/reset` | admin | Zero today's counters. |
+| `DELETE` | `/web/admin/users/{id}` | admin | Delete a user; keys and quota cascade, job history is kept. |
+
+Job submission and status polling from the console use the same `/v1/*`
+endpoints documented above, with the session cookie instead of a key.

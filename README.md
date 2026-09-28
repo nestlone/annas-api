@@ -21,6 +21,7 @@ index, download files with integrity checks, and optionally convert DjVu to PDF.
 - **Resumable transfers** — interrupted downloads resume with byte-range requests.
 - **Proxy routing** — optionally route CDN downloads through a rotating proxy pool.
 - **Bounded concurrency** — a local worker pool (1–10) with FIFO queueing.
+- **Web console** — a built-in page for per-user API keys, online search and download, quotas, and an administrator view for registration and users.
 - **One-command deploy** — Docker Compose; secrets live in an untracked `.env`.
 
 ## Quick start
@@ -28,10 +29,13 @@ index, download files with integrity checks, and optionally convert DjVu to PDF.
 Requires Docker with the Compose plugin.
 
 ```bash
-cp .env.example .env   # set FERRY_API_TOKEN and FERRY_API_SIGNING_KEY
+cp .env.example .env   # set FERRY_API_TOKEN, FERRY_API_SIGNING_KEY and FERRY_ADMIN_PASSWORD
 docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
+
+Then open `http://127.0.0.1:8000/` for the web console and log in with
+`FERRY_ADMIN_USERNAME` / `FERRY_ADMIN_PASSWORD` — see [Web console](docs/web.md).
 
 The service binds to `127.0.0.1:8000` only. Interactive OpenAPI docs:
 <http://127.0.0.1:8000/docs>.
@@ -67,6 +71,10 @@ The service reads a small set of environment variables (see
 | `FERRY_API_FILE_URL_TTL` | `900` | Download-link lifetime in seconds (60–86400). |
 | `FERRY_API_FILE_RETENTION_HOURS` | `24` | Hours a finished job and its file survive (1–8760). |
 | `FERRY_API_PUBLIC_BASE_URL` | — | Base URL for `status_url`/`download_url`; set it behind a reverse proxy that rewrites `Host`. |
+| `FERRY_ADMIN_USERNAME` | `admin` | Console administrator, created on first start. |
+| `FERRY_ADMIN_PASSWORD` | — | Initial password for that administrator; without it the first registrant becomes the administrator. |
+| `FERRY_REGISTRATION_OPEN` | `0` | Seeds whether the console offers open registration. |
+| `FERRY_SESSION_TTL_HOURS` | `168` | Console session lifetime. |
 | `FERRY_PROXY_POOL_URL` | — | Optional rotating proxy pool for CDN downloads. |
 
 Full details: [Configuration](docs/configuration.md).

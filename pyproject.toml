@@ -62,3 +62,6 @@ annas-api = "annas_api.engine:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["annas_api*"]
+
+[tool.setuptools.package-data]
+annas_api = ["static/*"]
