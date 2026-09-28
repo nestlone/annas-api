@@ -306,6 +306,7 @@ class ApiTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["count"], 1)
         self.assertEqual(body["files"][0]["name"], "Library book")
+        self.assertEqual(body["files"][0]["size_bytes"], len(b"content"))
         self.assertEqual(body["retention_seconds"], 24 * 3600)
         self.assertIn("available_until", body["files"][0])
         self.assertIn("/v1/files/", body["files"][0]["download_url"])

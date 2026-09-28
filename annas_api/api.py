@@ -178,6 +178,7 @@ def create_app(settings=None):
         return {
             "id": job["id"],
             "name": job["name"],
+            "size_bytes": job["size_bytes"],
             "created_at": job["created_at"],
             "completed_at": job["updated_at"],
             "available_until": job["updated_at"] + settings.retention_seconds,

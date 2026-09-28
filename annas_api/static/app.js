@@ -198,12 +198,12 @@ async function screenLogin() {
 async function screenSearch() {
   view().innerHTML =
     '<div class="card">' +
-    "<h1>在线检索</h1>" +
-    '<form id="search-form" class="row">' +
-    '<input name="query" placeholder="书名或关键词" required>' +
-    '<input name="ext" placeholder="格式（可选）" class="small">' +
-    '<input name="limit" type="number" min="1" max="50" value="10" class="small">' +
-    '<button type="submit">检索</button>' +
+    '<div class="screen-heading"><div><p class="eyebrow">SEARCH THE ARCHIVE</p><h1>在线检索</h1><p class="hint">输入书名、作者或主题；结果可直接加入下载队列。</p></div><span class="heading-tag">LIVE</span></div>' +
+    '<form id="search-form" class="search-form">' +
+    '<input name="query" placeholder="书名、作者或关键词" aria-label="检索关键词" required>' +
+    '<input name="ext" placeholder="格式" class="small" aria-label="文件格式（可选）">' +
+    '<input name="limit" type="number" min="1" max="50" value="10" class="small" aria-label="结果数量">' +
+    '<button type="submit">开始检索</button>' +
     "</form>" +
     '<div id="search-status" class="hint"></div>' +
     '<div id="search-result"></div>' +
@@ -245,13 +245,11 @@ function renderSearchResults(hits) {
     node.innerHTML = '<p class="hint">没有匹配的结果。</p>';
     return;
   }
-  node.innerHTML =
-    '<table><thead><tr><th>标题</th><th>格式</th><th>大小</th><th></th></tr></thead><tbody>' +
-    hits.map((hit, index) =>
-      "<tr><td>" + esc(hit.title || hit.md5) + "</td><td>" + esc(hit.format || "-") +
-      "</td><td>" + esc(hit.size || "-") + '</td><td class="right"><button data-index="' + index +
-      '" class="ghost">下载</button></td></tr>').join("") +
-    "</tbody></table>";
+  node.innerHTML = '<div class="result-grid">' + hits.map((hit, index) =>
+    '<article class="result-card"><div class="result-index">' + String(index + 1).padStart(2, "0") +
+    '</div><div class="result-copy"><h2>' + esc(hit.title || hit.md5) + '</h2><p><span>' + esc(hit.format || "未知格式") +
+    '</span><span>' + esc(hit.size || "大小未知") + '</span></p></div><button data-index="' + index +
+    '" class="ghost">加入下载</button></article>').join("") + "</div>";
   node.querySelectorAll("button[data-index]").forEach((button) => {
     button.onclick = () => startDownload(hits[Number(button.dataset.index)], button);
   });
@@ -287,13 +285,15 @@ async function startDownload(hit, button) {
 async function screenLibrary() {
   view().innerHTML =
     '<section class="library-hero">' +
-      '<div><p class="eyebrow">YOUR SHELF · 24H ARCHIVE</p><h1>图书馆</h1>' +
-      '<p>已验证完成的下载会保留 24 小时。每次打开此页都会生成新的安全下载链接。</p></div>' +
+      '<div><p class="eyebrow">PRIVATE SHELF · 24H ARCHIVE</p><h1>我的图书馆</h1>' +
+      '<p>这里仅显示你已完成的资源。文件保留 24 小时，每次打开都会生成新的安全下载链接。</p></div>' +
       '<div class="library-stamp">24<br><small>HOURS</small></div>' +
-    '</section><div id="library-body" class="library-grid"><p class="hint">正在整理书架…</p></div>';
+    '</section><div class="library-toolbar"><span id="library-count">正在整理书架…</span><button id="library-refresh" class="ghost">刷新书库</button></div><div id="library-body" class="library-grid"></div>';
+  document.getElementById("library-refresh").onclick = screenLibrary;
   const body = document.getElementById("library-body");
   try {
     const data = await API.get("/v1/library");
+    document.getElementById("library-count").textContent = "已保存 " + data.count + " 项 · 保留 " + Math.round(data.retention_seconds / 3600) + " 小时";
     if (!data.files.length) {
       body.innerHTML = '<div class="empty-shelf"><span aria-hidden="true">▱</span><h2>书架还是空的</h2><p>在检索结果中完成下载后，资源会出现在这里。</p><a class="button-link" href="#/search">去检索</a></div>';
       return;
@@ -301,9 +301,10 @@ async function screenLibrary() {
     body.innerHTML = data.files.map((file, index) =>
       '<article class="book-card">' +
         '<div class="book-spine"><span>' + String(index + 1).padStart(2, "0") + '</span><b>ANNAS<br>ARCHIVE</b></div>' +
-        '<div class="book-info"><p class="eyebrow">READY TO READ</p><h2>' + esc(file.name) + '</h2>' +
-        '<p class="hint">完成于 ' + esc(fmtTime(file.completed_at)) + ' · ' + esc(remainingLabel(file.available_until)) + '</p>' +
-        '<a class="button-link" href="' + esc(file.download_url) + '">再次下载 <span aria-hidden="true">↘</span></a></div>' +
+        '<div class="book-info"><p class="eyebrow">READY TO DOWNLOAD</p><h2 title="' + esc(file.name) + '">' + esc(file.name) + '</h2>' +
+        '<p class="book-meta"><span>' + esc(fmtBytes(file.size_bytes)) + '</span><span>' + esc(remainingLabel(file.available_until)) + '</span></p>' +
+        '<p class="hint">完成于 ' + esc(fmtTime(file.completed_at)) + '</p>' +
+        '<a class="button-link" download href="' + esc(file.download_url) + '">下载文件 <span aria-hidden="true">↘</span></a></div>' +
       '</article>'
     ).join("");
   } catch (error) {
@@ -316,7 +317,7 @@ async function screenLibrary() {
 async function screenJobs() {
   view().innerHTML =
     '<div class="card">' +
-    '<div class="row spread"><h1>我的任务</h1><button id="refresh" class="ghost">刷新</button></div>' +
+    '<div class="screen-heading"><div><p class="eyebrow">ACTIVITY LOG</p><h1>我的任务</h1><p class="hint">下载任务会显示当前已接收的数据量；完成后会自动进入图书馆。</p></div><button id="refresh" class="ghost">刷新任务</button></div>' +
     '<div id="jobs-body" class="hint">加载中…</div>' +
     "</div>";
   document.getElementById("refresh").onclick = screenJobs;

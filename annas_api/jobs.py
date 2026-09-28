@@ -344,7 +344,9 @@ class JobService:
             item["name"] = payload.get("name") or payload.get("md5") or "未命名资源"
             # A file can disappear between the retention sweep and this query.
             # Do not advertise stale entries as downloadable.
-            if self.completed_file(item["id"]):
+            completed = self.completed_file(item["id"])
+            if completed:
+                item["size_bytes"] = completed.stat().st_size
                 items.append(item)
         return items
 
