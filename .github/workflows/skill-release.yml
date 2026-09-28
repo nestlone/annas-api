@@ -76,17 +76,47 @@ jobs:
           ZIP: ${{ steps.version.outputs.zip }}
         run: |
           set -euo pipefail
-          find skill -name '__pycache__' -type d -prune -exec rm -rf {} +
-          mkdir -p dist
-          ( cd skill && zip -qr "../dist/$ZIP" annas-api )
-          ( cd dist && sha256sum "$ZIP" > "$ZIP.sha256" )
+          python - <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import zipfile
 
-          # Stable aliases so a fixed filename resolves within this release.
-          cp "dist/$ZIP" dist/annas-api-skill.zip
-          ( cd dist && sha256sum annas-api-skill.zip > annas-api-skill.zip.sha256 )
+          root = pathlib.Path("skill/annas-api")
+          dist = pathlib.Path("dist")
+          dist.mkdir(exist_ok=True)
+          zip_name = os.environ["ZIP"]
+          target = dist / zip_name
 
-          echo "digest=$(cut -d' ' -f1 "dist/$ZIP.sha256")" >> "$GITHUB_OUTPUT"
-          unzip -l "dist/$ZIP"
+          members = sorted(
+              path for path in root.rglob("*")
+              if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+          )
+          # Fixed timestamps keep the archive byte-identical for identical content,
+          # so the published checksum is reproducible.
+          with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in members:
+                  info = zipfile.ZipInfo("annas-api/" + path.relative_to(root).as_posix(),
+                                         date_time=(1980, 1, 1, 0, 0, 0))
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = 0o644 << 16
+                  archive.writestr(info, path.read_bytes())
+
+          digest = hashlib.sha256(target.read_bytes()).hexdigest()
+          # Stable alias so a fixed filename resolves within this release.
+          (dist / "annas-api-skill.zip").write_bytes(target.read_bytes())
+          for name in (zip_name, "annas-api-skill.zip"):
+              with (dist / (name + ".sha256")).open("w", encoding="utf-8", newline="\n") as handle:
+                  handle.write("{}  {}\n".format(digest, name))
+
+          with pathlib.Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8",
+                                                             newline="\n") as handle:
+              handle.write("digest={}\n".format(digest))
+          print("packaged {} files into {}".format(len(members), zip_name))
+          for path in members:
+              print("  annas-api/" + path.relative_to(root).as_posix())
+          print("sha256", digest)
+          PY
 
       - name: Write latest.json and release notes
         env:
@@ -121,8 +151,8 @@ jobs:
               "release_url": "https://github.com/{}/releases/tag/{}".format(repo, tag),
           }
           manifest = {k: v for k, v in manifest.items() if v}
-          pathlib.Path("dist/latest.json").write_text(
-              json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          with pathlib.Path("dist/latest.json").open("w", encoding="utf-8", newline="\n") as handle:
+              handle.write(json.dumps(manifest, indent=2) + "\n")
 
           lines = [
               "Agent Skill `annas-api` v{} — asynchronous search and verified downloads.".format(version),
@@ -150,7 +180,8 @@ jobs:
               "python annas-api/scripts/check_update.py --exit-code",
               "```",
           ]
-          pathlib.Path("release-notes.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          with pathlib.Path("release-notes.md").open("w", encoding="utf-8", newline="\n") as handle:
+              handle.write("\n".join(lines) + "\n")
           print("wrote dist/latest.json and release-notes.md")
           PY
 
