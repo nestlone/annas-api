@@ -1,6 +1,6 @@
 {
   "name": "annas-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Asynchronous search and verified-download jobs against an annas-api deployment.",
   "license": "MIT",
   "entrypoints": {
@@ -34,6 +34,8 @@
       "annas-api-skill-<version>.zip.sha256",
       "latest.json"
     ],
-    "update_command": "python scripts/check_update.py --exit-code"
+    "version_url": "https://raw.githubusercontent.com/nestlone/annas-api/main/skill/annas-api/VERSION",
+    "update_command": "python scripts/check_update.py --exit-code",
+    "update_sources": ["auto", "api", "manifest"]
   }
 }

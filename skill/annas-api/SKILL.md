@@ -10,7 +10,7 @@ description: >-
   default deployment is https://annas.nestlone.com.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
   service: annas.nestlone.com
   api-contract: v1
 ---
@@ -118,12 +118,21 @@ Runnable end-to-end recipes: [examples.md](examples.md).
 
 ## Updating the skill
 
-Releases are tagged `skill-v<version>` and carry a zip, its SHA-256, and a
-`latest.json` manifest.
+Releases are tagged `skill-v<version>` and carry the zip, its SHA-256, and a
+`latest.json` manifest. The installed copy records its version in `VERSION`, so
+updates can be detected mechanically:
 
 ```bash
-python scripts/check_update.py            # prints current vs. latest
+python scripts/check_update.py               # JSON: current vs. latest
 python scripts/check_update.py --exit-code   # exit 3 when an update exists
 ```
 
-See [../README.md](../README.md) for the install and verification procedure.
+`update_available` is the answer; `current` and `latest` explain it. The default
+source reads `VERSION` from the repository's default branch over the raw CDN and
+then optionally enriches the report with release asset URLs — the raw read has
+no API rate limit, so the check keeps working when the GitHub API does not. Use
+`--source api --token "$GITHUB_TOKEN"` to force the Releases API, or
+`--manifest-url` to read a manifest the deployment serves.
+
+Detect an update, then install the published archive; see
+[../README.md](../README.md) for the download and checksum procedure.

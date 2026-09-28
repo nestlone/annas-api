@@ -179,5 +179,27 @@ print("{} -> {}".format(book["title"], path))
 ```bash
 python scripts/check_update.py               # JSON: current vs. latest
 python scripts/check_update.py --exit-code   # exit 3 when an update exists
+```
+
+```json
+{
+  "current": "1.0.1",
+  "latest": "1.2.0",
+  "update_available": true,
+  "source": "version",
+  "tag": "skill-v1.2.0",
+  "zip_url": "https://github.com/nestlone/annas-api/releases/download/skill-v1.2.0/…zip",
+  "sha256_url": "https://github.com/nestlone/annas-api/releases/download/skill-v1.2.0/…zip.sha256"
+}
+```
+
+Other sources, when you want them:
+
+```bash
+python scripts/check_update.py --source api --token "$GITHUB_TOKEN"   # Releases API
 python scripts/check_update.py --manifest-url https://annas.nestlone.com/skill/latest.json
 ```
+
+Exit codes: `0` the check ran, `3` an update is available (with `--exit-code`),
+`4` the check itself failed — for example an exhausted API rate limit, which the
+default source avoids.

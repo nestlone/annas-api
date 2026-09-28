@@ -6,6 +6,20 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-28
+
+### Fixed
+
+- The update check no longer depends solely on the GitHub Releases API, which
+  allows only 60 unauthenticated requests per hour per IP. The default source
+  now reads `VERSION` from the default branch over the raw CDN and only
+  enriches the report with release asset URLs when the API is reachable.
+
+### Added
+
+- `check_update.py --source {auto,api,manifest}`, `--token` (or `GITHUB_TOKEN`),
+  and `--version-url`, plus a clear message when an API rate limit is hit.
+
 ## [1.0.0] - 2026-09-28
 
 ### Added
@@ -23,5 +37,6 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `skill-v*` GitHub release and reports whether an update is available.
 - `tests/test_client.py` — offline tests backed by a standard-library HTTP stub.
 
-[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.0...HEAD
+[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.1...HEAD
+[1.0.1]: https://github.com/nestlone/annas-api/compare/skill-v1.0.0...skill-v1.0.1
 [1.0.0]: https://github.com/nestlone/annas-api/releases/tag/skill-v1.0.0

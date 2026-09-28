@@ -16,6 +16,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 os.environ.setdefault("NO_PROXY", "127.0.0.1,localhost")
 os.environ.setdefault("no_proxy", "127.0.0.1,localhost")
@@ -46,6 +47,13 @@ class _Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_bytes(self, status, body):
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -89,6 +97,12 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/latest-same.json":
             return self._send_json(200, {"name": "annas-api",
                                          "version": check_update.read_local_version()})
+        if path == "/VERSION":
+            return self._send_bytes(200, check_update.read_local_version().encode() + b"\n")
+        if path == "/VERSION-newer":
+            return self._send_bytes(200, b"9.9.9\n")
+        if path == "/VERSION-garbage":
+            return self._send_bytes(200, b"not-a-version\n")
         if path.startswith("/v1/files/"):
             job_id = path.rsplit("/", 1)[-1]
             job = _Handler.jobs.get(job_id) or {}
@@ -315,6 +329,31 @@ class UpdateCheckTests(StubServerCase):
     def test_manifest_without_version_is_rejected(self):
         with self.assertRaises(check_update.UpdateCheckError):
             check_update.check_for_update(manifest_url=self.base + "/v1/nope")
+
+    def test_source_manifest_requires_a_manifest_url(self):
+        with self.assertRaises(check_update.UpdateCheckError):
+            check_update.check_for_update(source="manifest")
+
+    def test_raw_version_source_reports_up_to_date(self):
+        # The stub has no releases API, so asset enrichment must fail harmlessly.
+        with mock.patch.object(check_update, "RELEASES_API", self.base + "/api/releases"):
+            report = check_update.check_for_update(version_url=self.base + "/VERSION")
+        self.assertFalse(report["update_available"])
+        self.assertEqual(report["latest"], check_update.read_local_version())
+        self.assertEqual(report["source"], "version")
+        self.assertEqual(report["tag"], "skill-v" + report["latest"])
+        self.assertIsNone(report["zip_url"])
+
+    def test_raw_version_source_detects_a_newer_release(self):
+        with mock.patch.object(check_update, "RELEASES_API", self.base + "/api/releases"):
+            report = check_update.check_for_update(version_url=self.base + "/VERSION-newer")
+        self.assertTrue(report["update_available"])
+        self.assertEqual(report["latest"], "9.9.9")
+        self.assertIn("skill-v9.9.9", report["release_url"])
+
+    def test_raw_version_source_rejects_garbage(self):
+        with self.assertRaises(check_update.UpdateCheckError):
+            check_update.check_for_update(version_url=self.base + "/VERSION-garbage")
 
 
 if __name__ == "__main__":

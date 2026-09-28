@@ -31,10 +31,10 @@ skill/
 
 ## Install
 
-Skill releases are tagged `skill-v<version>` (kept separate from the application
-releases, so the repository's "latest release" still points at the service).
-Download the archive for the version you want and unzip it into your skills
-directory — the archive contains a top-level `annas-api/` folder:
+Skill releases are tagged `skill-v<version>`, distinct from the application's own
+tags, and are published with `--latest=false` so a skill release never becomes
+the repository's "latest release". Install a pinned version — the archive
+contains a top-level `annas-api/` folder:
 
 ```bash
 VERSION=1.0.0
@@ -72,10 +72,18 @@ python annas-api/scripts/check_update.py               # JSON report
 python annas-api/scripts/check_update.py --exit-code    # exit 3 if outdated
 ```
 
-The report compares the local `VERSION` against the newest `skill-v*` release
-and returns `current`, `latest`, `update_available`, and the release asset URLs.
-With `--manifest-url`, it reads a published `latest.json` instead of the GitHub
-API.
+The report compares the local `VERSION` against the newest published version and
+returns `current`, `latest`, `update_available`, plus the release asset URLs when
+they can be resolved.
+
+| Source | How it works |
+| --- | --- |
+| `auto` (default) | Reads `VERSION` from the default branch over the raw CDN — no API rate limit — then best-effort enriches with release asset URLs from the GitHub API. |
+| `api` | Queries the GitHub Releases API. Unauthenticated callers share 60 requests/hour per IP, so pass `--token "$GITHUB_TOKEN"`. |
+| `manifest` | Reads a published `latest.json` (`--manifest-url`), for deployments that serve one. |
+
+Exit codes: `0` the check ran, `3` an update is available (with `--exit-code`),
+`4` the check failed.
 
 ## Development
 
