@@ -1,0 +1,39 @@
+{
+  "name": "annas-api",
+  "version": "1.0.0",
+  "description": "Asynchronous search and verified-download jobs against an annas-api deployment.",
+  "license": "MIT",
+  "entrypoints": {
+    "skill": "SKILL.md",
+    "reference": "reference.md",
+    "examples": "examples.md",
+    "changelog": "CHANGELOG.md"
+  },
+  "scripts": {
+    "client": "scripts/annas_client.py",
+    "cli": "scripts/annas_cli.py",
+    "update": "scripts/check_update.py"
+  },
+  "tests": "tests/test_client.py",
+  "requires": {
+    "python": ">=3.9",
+    "runtime_dependencies": []
+  },
+  "service": {
+    "base_url": "https://annas.nestlone.com",
+    "base_url_env": "ANNAS_API_BASE_URL",
+    "token_env": "ANNAS_API_TOKEN",
+    "auth_header": "X-API-Key",
+    "api_contract": "v1"
+  },
+  "release": {
+    "repository": "nestlone/annas-api",
+    "tag_prefix": "skill-v",
+    "assets": [
+      "annas-api-skill-<version>.zip",
+      "annas-api-skill-<version>.zip.sha256",
+      "latest.json"
+    ],
+    "update_command": "python scripts/check_update.py --exit-code"
+  }
+}

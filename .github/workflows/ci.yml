@@ -47,3 +47,42 @@ jobs:
 
       - name: Test download validation and resume
         run: python -m unittest discover -s tests -v
+
+  skill:
+    name: Skill (ubuntu-latest - Python 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate skill script syntax
+        run: python -m compileall -q skill/annas-api
+
+      - name: Test skill client and update checker
+        run: python -m unittest discover -s skill/annas-api/tests -v
+
+      - name: Verify version mirrors agree
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path("skill/annas-api")
+          version = (root / "VERSION").read_text(encoding="utf-8").strip()
+          manifest = json.loads((root / "skill.json").read_text(encoding="utf-8"))["version"]
+          match = re.search(r'^\s*version:\s*"?([0-9][^"\s]*)"?\s*$',
+                            (root / "SKILL.md").read_text(encoding="utf-8"), re.M)
+          mirrors = {"skill.json": manifest, "SKILL.md": match.group(1) if match else None}
+          mismatched = {name: value for name, value in mirrors.items() if value != version}
+          if mismatched:
+              sys.exit("VERSION={} but {}".format(version, mismatched))
+          print("version mirrors agree on", version)
+          PY

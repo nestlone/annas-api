@@ -77,6 +77,7 @@ Full details: [Configuration](docs/configuration.md).
 - [CLI](docs/cli.md)
 - [Configuration](docs/configuration.md)
 - [Development](docs/development.md)
+- [Agent skill](skill/README.md) — packaged client for agent integration
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## License

@@ -72,6 +72,7 @@ curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
 - [CLI](docs/cli.md)
 - [配置](docs/configuration.md)
 - [开发指南](docs/development.md)
+- [Agent Skill](skill/README.md) —— 供 agent 直接接入的打包客户端
 - [贡献指南](CONTRIBUTING.md) · [安全策略](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md)
 
 ## 许可证

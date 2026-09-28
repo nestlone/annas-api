@@ -1,0 +1,173 @@
+name: Skill Release
+
+# Packages the agent skill in skill/annas-api/ and publishes it as a GitHub
+# Release tagged skill-v<version>. Bump skill/annas-api/VERSION to cut a release.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "skill/annas-api/**"
+      - ".github/workflows/skill-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skill-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and publish skill
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read skill version
+        id: version
+        run: |
+          version="$(tr -d '[:space:]' < skill/annas-api/VERSION)"
+          if [ -z "$version" ]; then
+            echo "skill/annas-api/VERSION is empty" >&2
+            exit 1
+          fi
+          {
+            echo "version=$version"
+            echo "tag=skill-v$version"
+            echo "zip=annas-api-skill-$version.zip"
+            echo "released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify version mirrors agree
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path("skill/annas-api")
+          version = (root / "VERSION").read_text(encoding="utf-8").strip()
+          manifest = json.loads((root / "skill.json").read_text(encoding="utf-8"))["version"]
+          match = re.search(r'^\s*version:\s*"?([0-9][^"\s]*)"?\s*$',
+                            (root / "SKILL.md").read_text(encoding="utf-8"), re.M)
+          mirrors = {"skill.json": manifest, "SKILL.md": match.group(1) if match else None}
+          mismatched = {name: value for name, value in mirrors.items() if value != version}
+          if mismatched:
+              sys.exit("VERSION={} but {}".format(version, mismatched))
+          print("version mirrors agree on", version)
+          PY
+
+      - name: Run offline skill tests
+        run: python -m unittest discover -s skill/annas-api/tests -v
+
+      - name: Build archive and checksums
+        id: build
+        env:
+          ZIP: ${{ steps.version.outputs.zip }}
+        run: |
+          set -euo pipefail
+          find skill -name '__pycache__' -type d -prune -exec rm -rf {} +
+          mkdir -p dist
+          ( cd skill && zip -qr "../dist/$ZIP" annas-api )
+          ( cd dist && sha256sum "$ZIP" > "$ZIP.sha256" )
+
+          # Stable aliases so a fixed filename resolves within this release.
+          cp "dist/$ZIP" dist/annas-api-skill.zip
+          ( cd dist && sha256sum annas-api-skill.zip > annas-api-skill.zip.sha256 )
+
+          echo "digest=$(cut -d' ' -f1 "dist/$ZIP.sha256")" >> "$GITHUB_OUTPUT"
+          unzip -l "dist/$ZIP"
+
+      - name: Write latest.json and release notes
+        env:
+          ZIP: ${{ steps.version.outputs.zip }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          RELEASED_AT: ${{ steps.version.outputs.released_at }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          tag = os.environ["TAG"]
+          version = os.environ["VERSION"]
+          digest = os.environ["DIGEST"]
+          zip_name = os.environ["ZIP"]
+          base = "https://github.com/{}/releases/download/{}".format(repo, tag)
+
+          manifest = {
+              "name": "annas-api",
+              "version": version,
+              "tag": tag,
+              "released_at": os.environ.get("RELEASED_AT"),
+              "asset_name": zip_name,
+              "zip_url": "{}/{}".format(base, zip_name),
+              "sha256_url": "{}/{}.sha256".format(base, zip_name),
+              "sha256": digest,
+              "release_url": "https://github.com/{}/releases/tag/{}".format(repo, tag),
+          }
+          manifest = {k: v for k, v in manifest.items() if v}
+          pathlib.Path("dist/latest.json").write_text(
+              json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+          lines = [
+              "Agent Skill `annas-api` v{} — asynchronous search and verified downloads.".format(version),
+              "",
+              "| Asset | File |",
+              "| --- | --- |",
+              "| Skill archive | `{}` |".format(zip_name),
+              "| Checksum | `{}.sha256` |".format(zip_name),
+              "| Update manifest | `latest.json` |",
+              "",
+              "### Install",
+              "",
+              "```bash",
+              "curl -L -o annas-api-skill.zip {}/{}".format(base, zip_name),
+              "curl -L -o annas-api-skill.zip.sha256 {}/{}.sha256".format(base, zip_name),
+              "sha256sum -c annas-api-skill.zip.sha256",
+              "unzip annas-api-skill.zip -d ~/.claude/skills/",
+              "```",
+              "",
+              "`sha256sum: {}`".format(digest),
+              "",
+              "### Update check",
+              "",
+              "```bash",
+              "python annas-api/scripts/check_update.py --exit-code",
+              "```",
+          ]
+          pathlib.Path("release-notes.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print("wrote dist/latest.json and release-notes.md")
+          PY
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG exists; refreshing assets"
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --title "annas-api skill v$VERSION" \
+              --notes-file release-notes.md \
+              --latest=false
+          fi
+          gh release view "$TAG" --json tagName,assets --jq '.tagName, (.assets[].name)'
