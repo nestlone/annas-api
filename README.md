@@ -41,8 +41,12 @@ curl http://127.0.0.1:8000/healthz
 
 Docker builds use the Tsinghua PyPI mirror by default to improve dependency
 downloads from mainland China. Set `ANNAS_API_PIP_INDEX_URL` in `.env` before
-rebuilding to use another index. This setting affects Python dependencies only;
-slow Playwright/Chromium downloads require separate network troubleshooting.
+rebuilding to use another index. Playwright uses the Tsinghua Debian mirror for
+system dependencies by default; set `ANNAS_API_DEBIAN_MIRROR_URL` to override
+it. Debian security updates remain on the official source. Slow browser-binary
+downloads use Playwright's official CDN with a 120-second connection timeout.
+Set `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` only for a trusted Playwright artifact
+repository; do not make an unknown third-party browser-binary mirror the default.
 
 Then open `http://127.0.0.1:8000/` for the web console and log in with
 `ANNAS_API_ADMIN_USERNAME` / `ANNAS_API_ADMIN_PASSWORD` — see [Web console](docs/web.md).

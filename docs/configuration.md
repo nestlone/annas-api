@@ -42,6 +42,22 @@ Each worker starts its own browser process, so memory grows with the worker coun
 keep it at or below 8 on a 2 GB host. Recreate the container after changes:
 `docker compose up -d`.
 
+## Build download sources
+
+The following `.env` variables apply while building the image rather than while
+the service is running:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ANNAS_API_PIP_INDEX_URL` | Tsinghua PyPI mirror | Python package index used by `pip`. |
+| `ANNAS_API_DEBIAN_MIRROR_URL` | Tsinghua Debian mirror | Main Debian package source used for Playwright system dependencies. Debian security updates remain official. |
+| `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` | empty | Optional trusted Playwright browser-artifact repository. Empty uses the official CDN. |
+| `ANNAS_API_PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT` | `120000` | Browser-download connection timeout in milliseconds. |
+
+Changing any of these values requires `docker compose up --build -d`.
+Docker Hub registry mirrors are configured in the host Docker daemon rather than
+in this project; use only an organization-approved registry mirror.
+
 ## Accounts and the web console
 
 The service serves a console at `/` with per-user API keys, online search and

@@ -38,7 +38,11 @@ curl http://127.0.0.1:8000/healthz
 
 Docker 构建默认通过清华 PyPI 镜像安装 Python 依赖，以改善中国大陆网络下的构建速度。
 如需使用其他镜像，可在 `.env` 中设置 `ANNAS_API_PIP_INDEX_URL` 后重新构建。
-该设置只影响 Python 依赖；Playwright/Chromium 下载较慢时需单独检查网络。
+Playwright 安装系统依赖时默认使用清华 Debian 镜像，可通过
+`ANNAS_API_DEBIAN_MIRROR_URL` 覆盖；Debian 安全更新保持使用官方源。浏览器二进制
+下载默认使用 Playwright 官方 CDN，并将连接超时设为 120 秒。若企业已有可信的
+Playwright 制品仓库，可通过 `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` 指定；不要将
+未知的第三方浏览器二进制镜像设为默认源。
 
 随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `ANNAS_API_ADMIN_USERNAME` /
 `ANNAS_API_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
