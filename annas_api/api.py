@@ -22,6 +22,8 @@ class Settings:
         self.api_token = os.environ.get("FERRY_API_TOKEN")
         self.signing_key = os.environ.get("FERRY_API_SIGNING_KEY") or self.api_token or "development-only-change-me"
         self.file_url_ttl = max(60, min(int(os.environ.get("FERRY_API_FILE_URL_TTL", "900")), 86400))
+        retention_hours = max(1, min(int(os.environ.get("FERRY_API_FILE_RETENTION_HOURS", "24")), 8760))
+        self.retention_seconds = retention_hours * 3600
 
 
 class SearchRequest(BaseModel):
@@ -41,7 +43,9 @@ def create_app(settings=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        app.state.jobs = JobService(settings.data_dir, settings.workers)
+        app.state.jobs = JobService(
+            settings.data_dir, settings.workers, retention_seconds=settings.retention_seconds
+        )
         yield
         app.state.jobs.close()
 

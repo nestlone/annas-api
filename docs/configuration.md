@@ -13,6 +13,7 @@ FERRY_API_TOKEN=replace-with-a-long-random-api-token
 FERRY_API_SIGNING_KEY=replace-with-a-different-long-random-signing-key
 FERRY_API_WORKERS=8
 FERRY_API_FILE_URL_TTL=900
+FERRY_API_FILE_RETENTION_HOURS=24
 ```
 
 | Variable | Required | Default | Description |
@@ -21,6 +22,7 @@ FERRY_API_FILE_URL_TTL=900
 | `FERRY_API_SIGNING_KEY` | yes | — | HMAC key for download URLs; must differ from the token. |
 | `FERRY_API_WORKERS` | no | `2` | Local worker count, clamped to 1–10. |
 | `FERRY_API_FILE_URL_TTL` | no | `900` | Download-link lifetime, clamped to 60–86400 seconds. |
+| `FERRY_API_FILE_RETENTION_HOURS` | no | `24` | Hours a finished job and its file survive, clamped to 1–8760. |
 | `FERRY_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
 | `FERRY_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
 
@@ -81,5 +83,15 @@ The `ferry-data` volume holds:
 - `/data/jobs.sqlite3` — job state and error summaries.
 - `/data/downloads/` — validated, delivered files.
 
-Production deployments should define expiry, quota, backup, and access policies.
+A background sweeper runs at startup and every 10 minutes. Once a job has been in a
+terminal state (`completed`, `failed`, `cancelled`) for longer than
+`FERRY_API_FILE_RETENTION_HOURS`, it deletes the job directory and then the database
+row. Queued and running jobs are never touched. After expiry, `GET /v1/jobs/{id}`
+returns `404` and the signed download URL stops resolving.
+
+Because the link TTL (default 15 minutes) is far shorter than the retention window,
+a file is normally fetched long before cleanup. Set the window longer only if clients
+may return to a completed job hours later.
+
+Production deployments should still define quota, backup, and access policies.
 `docker compose down -v` deletes the volume and all its data.

@@ -138,13 +138,51 @@ class JobServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.jobs.list_jobs(status="bogus")
 
+    def test_purge_expired_removes_files_and_rows(self):
+        def fake_download(**kwargs):
+            target = Path(kwargs["output_dir"]) / "book.epub"
+            target.write_bytes(b"content")
+            return str(target)
+
+        with patch("annas_api.jobs.download_book", side_effect=fake_download):
+            job_id = self.jobs.submit_download(md5="0" * 32)
+            self.wait_for(job_id)
+        job_dir = self.jobs.download_dir / job_id
+        self.assertTrue(job_dir.is_dir())
+
+        # Freshly finished: inside the window, nothing is removed.
+        self.assertEqual(self.jobs.purge_expired(), 0)
+        self.assertIsNotNone(self.jobs.get(job_id))
+
+        future = int(time.time()) + self.jobs.retention_seconds + 1
+        self.assertEqual(self.jobs.purge_expired(now=future), 1)
+        self.assertIsNone(self.jobs.get(job_id))
+        self.assertFalse(job_dir.exists())
+
+    def test_purge_expired_never_touches_active_jobs(self):
+        started, gate = threading.Event(), threading.Event()
+        self.addCleanup(gate.set)
+        with self.block_worker(started, gate):
+            job_id = self.jobs.submit_search("hold")
+            self.assertTrue(started.wait(5))
+            # A far-future cutoff must still leave the running job alone.
+            self.assertEqual(self.jobs.purge_expired(now=int(time.time()) + 10 ** 6), 0)
+            self.assertIsNotNone(self.jobs.get(job_id))
+            gate.set()
+            self.wait_for(job_id)
+
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.settings = SimpleNamespace(
-            data_dir=Path(self.folder.name), workers=1, api_token="token", signing_key="secret", file_url_ttl=300
+            data_dir=Path(self.folder.name),
+            workers=1,
+            api_token="token",
+            signing_key="secret",
+            file_url_ttl=300,
+            retention_seconds=24 * 3600,
         )
 
     def test_requires_token_and_returns_completed_search(self):

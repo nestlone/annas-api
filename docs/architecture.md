@@ -29,7 +29,7 @@ flowchart LR
 
 ## Job lifecycle
 
-`queued` → `running` → `completed` | `failed`
+`queued` → `running` → `completed` | `failed` | `cancelled`
 
 - Only `queued` jobs can be cancelled (to `cancelled`); a `running` job cannot be
   interrupted.
@@ -37,6 +37,8 @@ flowchart LR
   file path only after validation.
 - Failures store a truncated error summary; partial transfers may be kept for a retry.
 - On restart, unfinished jobs are marked failed rather than falsely reported as complete.
+- Terminal jobs expire after `FERRY_API_FILE_RETENTION_HOURS`: a sweeper deletes the
+  job directory and then the database row. Active jobs are never purged.
 
 ## Data boundaries
 

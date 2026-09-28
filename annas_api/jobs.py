@@ -1,6 +1,7 @@
 """Durable background jobs for the HTTP API."""
 
 import json
+import shutil
 import sqlite3
 import threading
 import time
@@ -12,20 +13,29 @@ from .downloader import validate_md5, validate_public_https
 from .engine import download_book, search_books
 
 KNOWN_STATUSES = ("queued", "running", "completed", "failed", "cancelled")
+TERMINAL_STATUSES = ("completed", "failed", "cancelled")
+DEFAULT_RETENTION_SECONDS = 24 * 60 * 60
+SWEEP_INTERVAL_SECONDS = 10 * 60
 
 
 class JobService:
     """SQLite-backed jobs executed by a bounded local worker pool."""
 
-    def __init__(self, data_dir, workers=2):
+    def __init__(self, data_dir, workers=2, retention_seconds=DEFAULT_RETENTION_SECONDS):
         self.data_dir = Path(data_dir).resolve()
         self.download_dir = self.data_dir / "downloads"
         self.database = self.data_dir / "jobs.sqlite3"
+        self.retention_seconds = retention_seconds
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ferry-job")
         self._futures = {}
         self._futures_lock = threading.Lock()
+        self._stop = threading.Event()
         self._initialize()
+        self._sweeper = threading.Thread(
+            target=self._sweep_loop, name="ferry-retention", daemon=True
+        )
+        self._sweeper.start()
 
     def _connect(self):
         connection = sqlite3.connect(str(self.database), timeout=30)
@@ -62,7 +72,55 @@ class JobService:
             connection.close()
 
     def close(self):
+        self._stop.set()
+        self._sweeper.join(timeout=5)
         self._executor.shutdown(wait=False, cancel_futures=True)
+
+    def _sweep_loop(self):
+        while True:
+            try:
+                self.purge_expired()
+            except Exception:
+                # A transient failure (e.g. a locked database) must not kill the
+                # sweeper; the next tick retries.
+                pass
+            if self._stop.wait(SWEEP_INTERVAL_SECONDS):
+                return
+
+    def purge_expired(self, now=None):
+        """Delete finished jobs and their delivered files past the retention window.
+
+        Only terminal rows are eligible. Queued and running jobs have no file yet
+        and may still be mutated by a worker, so they are never touched. Files go
+        first: if the row delete then fails, ``completed_file`` still rejects the
+        missing path and the next sweep retries the row.
+        """
+        cutoff = (int(time.time()) if now is None else now) - self.retention_seconds
+        placeholders = ", ".join("?" * len(TERMINAL_STATUSES))
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                f"SELECT id FROM jobs WHERE status IN ({placeholders}) AND updated_at < ?",
+                (*TERMINAL_STATUSES, cutoff),
+            ).fetchall()
+        finally:
+            connection.close()
+
+        expired = [row["id"] for row in rows]
+        if not expired:
+            return 0
+        for job_id in expired:
+            shutil.rmtree(self.download_dir / job_id, ignore_errors=True)
+
+        connection = self._connect()
+        try:
+            connection.executemany(
+                "DELETE FROM jobs WHERE id = ?", [(job_id,) for job_id in expired]
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return len(expired)
 
     def submit_search(self, query, ext=None, limit=10):
         if not query or not query.strip():
