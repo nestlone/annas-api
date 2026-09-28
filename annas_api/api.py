@@ -22,6 +22,7 @@ class Settings:
         self.api_token = os.environ.get("FERRY_API_TOKEN")
         self.signing_key = os.environ.get("FERRY_API_SIGNING_KEY") or self.api_token or "development-only-change-me"
         self.file_url_ttl = max(60, min(int(os.environ.get("FERRY_API_FILE_URL_TTL", "900")), 86400))
+        self.public_base_url = (os.environ.get("FERRY_API_PUBLIC_BASE_URL") or "").rstrip("/")
         retention_hours = max(1, min(int(os.environ.get("FERRY_API_FILE_RETENTION_HOURS", "24")), 8760))
         self.retention_seconds = retention_hours * 3600
 
@@ -58,12 +59,19 @@ def create_app(settings=None):
     def service(request: Request):
         return request.app.state.jobs
 
+    def base_url(request):
+        """Base for generated links; FERRY_API_PUBLIC_BASE_URL wins over the request.
+
+        A reverse proxy that forwards its upstream address as the Host header
+        would otherwise leak an unreachable internal URL to clients.
+        """
+        return settings.public_base_url or str(request.base_url).rstrip("/")
+
     def signed_download_url(request, job):
         expires = int(time.time()) + settings.file_url_ttl
         payload = f"{job['id']}:{expires}".encode("utf-8")
         signature = hmac.new(settings.signing_key.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-        base = str(request.base_url).rstrip("/")
-        return f"{base}/v1/files/{job['id']}?expires={expires}&signature={signature}"
+        return f"{base_url(request)}/v1/files/{job['id']}?expires={expires}&signature={signature}"
 
     def job_response(request, job):
         response = {
@@ -103,7 +111,7 @@ def create_app(settings=None):
             job_id = jobs.submit_search(body.query, body.ext, body.limit)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return {"id": job_id, "status": "queued", "status_url": str(request.base_url).rstrip("/") + f"/v1/jobs/{job_id}"}
+        return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}
 
     @app.post("/v1/downloads", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_token)])
     def submit_download(body: DownloadRequest, request: Request, jobs=Depends(service)):
@@ -111,7 +119,7 @@ def create_app(settings=None):
             job_id = jobs.submit_download(body.md5, body.direct_url, body.name)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return {"id": job_id, "status": "queued", "status_url": str(request.base_url).rstrip("/") + f"/v1/jobs/{job_id}"}
+        return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}
 
     @app.get("/v1/jobs", dependencies=[Depends(require_token)])
     def list_jobs(

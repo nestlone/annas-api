@@ -69,6 +69,11 @@ adds a `download_url`.
 The download URL is time-limited and needs no API key. Treat it as a sensitive
 temporary credential and keep it out of public logs.
 
+`status_url` and `download_url` are derived from the request's `Host` header
+unless `FERRY_API_PUBLIC_BASE_URL` is set, which takes precedence. Set it when
+the service runs behind a reverse proxy that rewrites `Host`, otherwise clients
+receive links carrying the proxy's upstream address.
+
 ## List jobs
 
 `GET /v1/jobs`

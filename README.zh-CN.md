@@ -61,6 +61,7 @@ curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
 | `FERRY_API_WORKERS` | `2` | 本地 Worker 数，限制为 1–10。 |
 | `FERRY_API_FILE_URL_TTL` | `900` | 下载链接有效秒数（60–86400）。 |
 | `FERRY_API_FILE_RETENTION_HOURS` | `24` | 任务完成后文件与记录的保留小时数（1–8760）。 |
+| `FERRY_API_PUBLIC_BASE_URL` | — | `status_url`/`download_url` 的基地址；反向代理改写 `Host` 时需设置。 |
 | `FERRY_PROXY_POOL_URL` | — | 可选的轮换代理池地址，用于 CDN 下载。 |
 
 详见[配置](docs/configuration.md)。

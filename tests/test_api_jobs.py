@@ -183,7 +183,16 @@ class ApiTests(unittest.TestCase):
             signing_key="secret",
             file_url_ttl=300,
             retention_seconds=24 * 3600,
+            public_base_url="",
         )
+
+    def wait_until_done(self, client, job_id, attempts=100):
+        for _ in range(attempts):
+            response = client.get(f"/v1/jobs/{job_id}", headers={"X-API-Key": "token"})
+            if response.json()["status"] in {"completed", "failed", "cancelled"}:
+                return response
+            time.sleep(0.01)
+        self.fail("job did not finish")
 
     def test_requires_token_and_returns_completed_search(self):
         with patch("annas_api.jobs.search_books", return_value=[]):
@@ -199,6 +208,43 @@ class ApiTests(unittest.TestCase):
                         break
                     time.sleep(0.01)
                 self.assertEqual(response.json()["result"], [])
+
+    def test_links_fall_back_to_request_host_when_unset(self):
+        with patch("annas_api.jobs.search_books", return_value=[]):
+            with TestClient(create_app(self.settings)) as client:
+                created = client.post("/v1/search", headers={"X-API-Key": "token"}, json={"query": "example"})
+                self.assertTrue(created.json()["status_url"].startswith("http://testserver/v1/jobs/"))
+                self.wait_until_done(client, created.json()["id"])
+
+    def test_public_base_url_replaces_the_request_host(self):
+        self.settings.public_base_url = "https://annas.example.com"
+        with patch("annas_api.jobs.search_books", return_value=[]):
+            with TestClient(create_app(self.settings)) as client:
+                created = client.post("/v1/search", headers={"X-API-Key": "token"}, json={"query": "example"})
+                self.assertTrue(
+                    created.json()["status_url"].startswith("https://annas.example.com/v1/jobs/")
+                )
+                self.wait_until_done(client, created.json()["id"])
+
+    def test_public_base_url_applies_to_download_url(self):
+        self.settings.public_base_url = "https://annas.example.com"
+
+        def fake_download(**kwargs):
+            target = Path(kwargs["output_dir"]) / "book.epub"
+            target.write_bytes(b"content")
+            return str(target)
+
+        with patch("annas_api.jobs.download_book", side_effect=fake_download):
+            with TestClient(create_app(self.settings)) as client:
+                created = client.post("/v1/downloads", headers={"X-API-Key": "token"}, json={"md5": "0" * 32})
+                job_id = created.json()["id"]
+                for _ in range(100):
+                    response = client.get(f"/v1/jobs/{job_id}", headers={"X-API-Key": "token"})
+                    if response.json()["status"] == "completed":
+                        break
+                    time.sleep(0.01)
+                url = response.json()["download_url"]
+                self.assertTrue(url.startswith("https://annas.example.com/v1/files/"), url)
 
     def test_jobs_list_requires_token(self):
         with TestClient(create_app(self.settings)) as client:

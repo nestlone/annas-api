@@ -66,6 +66,7 @@ The service reads a small set of environment variables (see
 | `FERRY_API_WORKERS` | `2` | Local worker count, clamped to 1–10. |
 | `FERRY_API_FILE_URL_TTL` | `900` | Download-link lifetime in seconds (60–86400). |
 | `FERRY_API_FILE_RETENTION_HOURS` | `24` | Hours a finished job and its file survive (1–8760). |
+| `FERRY_API_PUBLIC_BASE_URL` | — | Base URL for `status_url`/`download_url`; set it behind a reverse proxy that rewrites `Host`. |
 | `FERRY_PROXY_POOL_URL` | — | Optional rotating proxy pool for CDN downloads. |
 
 Full details: [Configuration](docs/configuration.md).

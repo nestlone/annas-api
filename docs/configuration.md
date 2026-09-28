@@ -14,6 +14,7 @@ FERRY_API_SIGNING_KEY=replace-with-a-different-long-random-signing-key
 FERRY_API_WORKERS=8
 FERRY_API_FILE_URL_TTL=900
 FERRY_API_FILE_RETENTION_HOURS=24
+FERRY_API_PUBLIC_BASE_URL=https://annas.nestlone.com
 ```
 
 | Variable | Required | Default | Description |
@@ -24,6 +25,7 @@ FERRY_API_FILE_RETENTION_HOURS=24
 | `FERRY_API_FILE_URL_TTL` | no | `900` | Download-link lifetime, clamped to 60–86400 seconds. |
 | `FERRY_API_FILE_RETENTION_HOURS` | no | `24` | Hours a finished job and its file survive, clamped to 1–8760. |
 | `FERRY_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
+| `FERRY_API_PUBLIC_BASE_URL` | no | — | Base URL for the `status_url` and `download_url` links. Set it when the service sits behind a reverse proxy that does not forward the original `Host` header; unset, links are derived from the request. |
 | `FERRY_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
 
 Each worker starts its own browser process, so memory grows with the worker count;
