@@ -40,6 +40,23 @@ Then open `http://127.0.0.1:8000/` for the web console and log in with
 The service binds to `127.0.0.1:8000` only. Interactive OpenAPI docs:
 <http://127.0.0.1:8000/docs>.
 
+### Optional: production source mount
+
+The default deployment builds the application code into the image for
+reproducible releases. To update application code quickly on the same host with
+`git pull`, use the read-only source-mount override:
+
+```bash
+docker compose -f compose.yaml -f compose.mount.yaml up --build -d  # first run
+git pull --ff-only
+docker compose -f compose.yaml -f compose.mount.yaml restart ferry-api
+curl http://127.0.0.1:8000/healthz
+```
+
+Only `annas_api/` is mounted; data remains in the `ferry-data` volume. Changes
+to `pyproject.toml`, dependencies, or the `Dockerfile` still require `--build`.
+Do not use `--reload` in production.
+
 ## Usage
 
 ```bash

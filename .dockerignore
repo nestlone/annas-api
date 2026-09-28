@@ -1,8 +1,11 @@
 .git
+.env
 .venv
 __pycache__
 *.py[cod]
 .pytest_cache
+.visual-check-data
+*.sqlite3
 ferry-data
 downloads
 work

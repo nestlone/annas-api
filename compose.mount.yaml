@@ -1,0 +1,7 @@
+# Production convenience override: run the checked-out application source read-only.
+# Use with: docker compose -f compose.yaml -f compose.mount.yaml up -d
+# Dependency or Dockerfile changes still require `docker compose ... up --build -d`.
+services:
+  ferry-api:
+    volumes:
+      - ./annas_api:/app/annas_api:ro
