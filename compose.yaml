@@ -18,7 +18,7 @@ services:
       - annas-api-data:/data
     networks:
       annas-api-net:
-        ipv4_address: 172.20.0.12
+        ipv4_address: 172.22.0.12
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz')"]
       interval: 30s
@@ -35,4 +35,4 @@ networks:
     name: annas-api-net
     ipam:
       config:
-        - subnet: 172.20.0.0/24
+        - subnet: 172.22.0.0/24
