@@ -28,14 +28,19 @@ index, download files with integrity checks, and optionally convert DjVu to PDF.
 
 Requires Docker with the Compose plugin.
 
+> **Naming reset:** configuration now uses `ANNAS_API_*` variables, the Compose
+> service is `annas-api`, and issued API keys begin with `annas_`. Copy the
+> current `.env.example` when creating a deployment; earlier variable names are
+> intentionally unsupported.
+
 ```bash
-cp .env.example .env   # set FERRY_API_TOKEN, FERRY_API_SIGNING_KEY and FERRY_ADMIN_PASSWORD
+cp .env.example .env   # set ANNAS_API_TOKEN, ANNAS_API_SIGNING_KEY and ANNAS_API_ADMIN_PASSWORD
 docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
 
 Then open `http://127.0.0.1:8000/` for the web console and log in with
-`FERRY_ADMIN_USERNAME` / `FERRY_ADMIN_PASSWORD` — see [Web console](docs/web.md).
+`ANNAS_API_ADMIN_USERNAME` / `ANNAS_API_ADMIN_PASSWORD` — see [Web console](docs/web.md).
 
 The service binds to `127.0.0.1:8000` only. Interactive OpenAPI docs:
 <http://127.0.0.1:8000/docs>.
@@ -48,11 +53,11 @@ can be updated quickly on the same host with `git pull`:
 ```bash
 docker compose up --build -d  # first run
 git pull --ff-only
-docker compose restart ferry-api
+docker compose restart annas-api
 curl http://127.0.0.1:8000/healthz
 ```
 
-Data remains in the `ferry-data` volume. Changes to `pyproject.toml`,
+Data remains in the `annas-api-data` volume. Changes to `pyproject.toml`,
 dependencies, or the `Dockerfile` still require `--build`. Do not use
 `--reload` in production.
 
@@ -61,13 +66,13 @@ dependencies, or the `Dockerfile` still require `--build`. Do not use
 ```bash
 # Submit a search.
 curl -X POST http://127.0.0.1:8000/v1/search \
-  -H "X-API-Key: $FERRY_API_TOKEN" -H 'Content-Type: application/json' \
+  -H "X-API-Key: $ANNAS_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"example title","limit":5}'
 
 # Poll a job, inspect the queue, cancel a queued job.
-curl -H "X-API-Key: $FERRY_API_TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>
-curl -H "X-API-Key: $FERRY_API_TOKEN" 'http://127.0.0.1:8000/v1/jobs?status=queued'
-curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
+curl -H "X-API-Key: $ANNAS_API_TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>
+curl -H "X-API-Key: $ANNAS_API_TOKEN" 'http://127.0.0.1:8000/v1/jobs?status=queued'
+curl -X POST -H "X-API-Key: $ANNAS_API_TOKEN" \
   http://127.0.0.1:8000/v1/jobs/<job-id>/cancel
 ```
 
@@ -81,17 +86,17 @@ The service reads a small set of environment variables (see
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `FERRY_API_TOKEN` | — | `X-API-Key` for management endpoints (required). |
-| `FERRY_API_SIGNING_KEY` | — | HMAC key for download URLs (required; must differ from the token). |
-| `FERRY_API_WORKERS` | `2` | Local worker count, clamped to 1–10. |
-| `FERRY_API_FILE_URL_TTL` | `900` | Download-link lifetime in seconds (60–86400). |
-| `FERRY_API_FILE_RETENTION_HOURS` | `24` | Hours a finished job and its file survive (1–8760). |
-| `FERRY_API_PUBLIC_BASE_URL` | — | Base URL for `status_url`/`download_url`; set it behind a reverse proxy that rewrites `Host`. |
-| `FERRY_ADMIN_USERNAME` | `admin` | Console administrator, created on first start. |
-| `FERRY_ADMIN_PASSWORD` | — | Initial password for that administrator; without it the first registrant becomes the administrator. |
-| `FERRY_REGISTRATION_OPEN` | `0` | Seeds whether the console offers open registration. |
-| `FERRY_SESSION_TTL_HOURS` | `168` | Console session lifetime. |
-| `FERRY_PROXY_POOL_URL` | — | Optional rotating proxy pool for CDN downloads. |
+| `ANNAS_API_TOKEN` | — | `X-API-Key` for management endpoints (required). |
+| `ANNAS_API_SIGNING_KEY` | — | HMAC key for download URLs (required; must differ from the token). |
+| `ANNAS_API_WORKERS` | `2` | Local worker count, clamped to 1–10. |
+| `ANNAS_API_FILE_URL_TTL` | `900` | Download-link lifetime in seconds (60–86400). |
+| `ANNAS_API_FILE_RETENTION_HOURS` | `24` | Hours a finished job and its file survive (1–8760). |
+| `ANNAS_API_PUBLIC_BASE_URL` | — | Base URL for `status_url`/`download_url`; set it behind a reverse proxy that rewrites `Host`. |
+| `ANNAS_API_ADMIN_USERNAME` | `admin` | Console administrator, created on first start. |
+| `ANNAS_API_ADMIN_PASSWORD` | — | Initial password for that administrator; without it the first registrant becomes the administrator. |
+| `ANNAS_API_REGISTRATION_OPEN` | `0` | Seeds whether the console offers open registration. |
+| `ANNAS_API_SESSION_TTL_HOURS` | `168` | Console session lifetime. |
+| `ANNAS_API_PROXY_POOL_URL` | — | Optional rotating proxy pool for CDN downloads. |
 
 Full details: [Configuration](docs/configuration.md).
 

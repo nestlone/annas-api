@@ -6,7 +6,7 @@ __pycache__
 .pytest_cache
 .visual-check-data
 *.sqlite3
-ferry-data
+annas-api-data
 downloads
 work
 tests

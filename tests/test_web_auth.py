@@ -202,7 +202,7 @@ class ApiKeyAuthTests(unittest.TestCase):
             self.assertEqual(created.status_code, 201, created.text)
             raw = created.json()["key"]
             key_id = created.json()["id"]
-            self.assertTrue(raw.startswith("fry_"))
+            self.assertTrue(raw.startswith("annas_"))
             # The secret is never readable again.
             self.assertNotIn("key", client.get("/web/keys").json()["keys"][0])
             client.post("/web/logout")
@@ -227,7 +227,7 @@ class ApiKeyAuthTests(unittest.TestCase):
     def test_an_unknown_key_is_rejected(self):
         with self.make_client(api_token=None, admin_password="adminpass123") as client:
             self.assertEqual(
-                client.get("/v1/jobs", headers={"X-API-Key": "fry_not-a-key"}).status_code, 401
+                client.get("/v1/jobs", headers={"X-API-Key": "annas_not-a-key"}).status_code, 401
             )
             self.assertEqual(client.get("/v1/jobs").status_code, 401)
 

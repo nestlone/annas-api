@@ -21,10 +21,10 @@ class PasswordTests(unittest.TestCase):
 
     def test_api_key_shape(self):
         raw, prefix, digest = security.generate_api_key()
-        self.assertTrue(raw.startswith("fry_"))
+        self.assertTrue(raw.startswith("annas_"))
         self.assertEqual(prefix, raw[:12])
         self.assertEqual(digest, security.hash_api_key(raw))
-        self.assertEqual(len(security.generate_session_token()), len(raw) - len("fry_"))
+        self.assertEqual(len(security.generate_session_token()), len(raw) - len("annas_"))
 
 
 class AccountStoreTests(unittest.TestCase):
@@ -60,7 +60,7 @@ class AccountStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.lookup_key(created["key"]))
 
     def test_unknown_api_key_is_rejected(self):
-        self.assertIsNone(self.store.lookup_key("fry_nope"))
+        self.assertIsNone(self.store.lookup_key("annas_nope"))
         self.assertIsNone(self.store.lookup_key(None))
 
     def test_key_of_a_disabled_user_is_rejected(self):

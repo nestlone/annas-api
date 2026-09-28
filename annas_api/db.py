@@ -1,4 +1,4 @@
-"""SQLite access and schema for the ferry service.
+"""SQLite access and schema for annas-api.
 
 Everything lives in one database file on purpose: a quota check and the job row
 it guards must be written in a single transaction, so they cannot share an

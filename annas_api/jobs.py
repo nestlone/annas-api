@@ -30,13 +30,13 @@ class JobService:
         # quota enforcement entirely (anonymous / single-token deployments).
         self.quota = None
         self.download_dir.mkdir(parents=True, exist_ok=True)
-        self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ferry-job")
+        self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="annas-api-job")
         self._futures = {}
         self._futures_lock = threading.Lock()
         self._stop = threading.Event()
         self._initialize()
         self._sweeper = threading.Thread(
-            target=self._sweep_loop, name="ferry-retention", daemon=True
+            target=self._sweep_loop, name="annas-api-retention", daemon=True
         )
         self._sweeper.start()
 

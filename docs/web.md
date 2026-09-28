@@ -10,14 +10,14 @@ database as the jobs.
 Set an administrator in the environment before the first deploy:
 
 ```ini
-FERRY_ADMIN_USERNAME=admin
-FERRY_ADMIN_PASSWORD=change-me-to-something-strong
+ANNAS_API_ADMIN_USERNAME=admin
+ANNAS_API_ADMIN_PASSWORD=change-me-to-something-strong
 ```
 
 The account is created on start. The variable only *seeds* it, so a password
 changed from the console is not reverted by a later restart.
 
-If `FERRY_ADMIN_PASSWORD` is empty, no administrator is created and the **first
+If `ANNAS_API_ADMIN_PASSWORD` is empty, no administrator is created and the **first
 account to register becomes the administrator**. That path exists so a fresh
 deployment can be set up without shell access; on a public host it also means
 whoever registers first wins, so set the password instead.
@@ -25,7 +25,7 @@ whoever registers first wins, so set the password instead.
 ## Registration
 
 Registration is closed by default and is controlled by the administrator from
-the console. `FERRY_REGISTRATION_OPEN=1` seeds it to open on first start; the
+the console. `ANNAS_API_REGISTRATION_OPEN=1` seeds it to open on first start; the
 console value wins afterwards. A registrant is always a regular user.
 
 ## Using the console
@@ -41,14 +41,14 @@ console value wins afterwards. A registrant is always a regular user.
 
 ## API keys
 
-A key replaces `FERRY_API_TOKEN` in any request:
+A key replaces `ANNAS_API_TOKEN` in any request:
 
 ```bash
-curl -H "X-API-Key: fry_..." https://example.com/v1/jobs
+curl -H "X-API-Key: annas_..." https://example.com/v1/jobs
 ```
 
 Keys carry their owner's identity. A regular user sees only their own jobs;
-`FERRY_API_TOKEN` and administrators see all of them. Revoking a key, or
+`ANNAS_API_TOKEN` and administrators see all of them. Revoking a key, or
 disabling its owner, takes effect on the next request.
 
 Key remarks are editable and never change the secret. To rotate a secret,
@@ -70,12 +70,12 @@ message naming which limit was hit; it is not counted. A job that fails still
 consumes its unit — an administrator can zero the counters with
 **重置用量 (Reset usage)**.
 
-`FERRY_API_TOKEN` is an administrator key and is never quota-limited.
+`ANNAS_API_TOKEN` is an administrator key and is never quota-limited.
 
 ## Sessions
 
 Logging in sets an HttpOnly, SameSite=Lax cookie valid for
-`FERRY_SESSION_TTL_HOURS` (168 by default). The cookie is marked `Secure` when
+`ANNAS_API_SESSION_TTL_HOURS` (168 by default). The cookie is marked `Secure` when
 the public base URL is HTTPS. Sessions are rows in the database, so logging out,
 disabling a user, or deleting a user invalidates them immediately.
 

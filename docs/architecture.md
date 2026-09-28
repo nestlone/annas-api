@@ -42,7 +42,7 @@ check and the job insert happen in one transaction: a submit takes
 `BEGIN IMMEDIATE`, reserves its unit, and only then inserts the row. Two
 concurrent submits therefore cannot both slip past the same limit.
 
-A job records an `owner_id`. Administrators and `FERRY_API_TOKEN` see every job;
+A job records an `owner_id`. Administrators and `ANNAS_API_TOKEN` see every job;
 a regular key sees only its owner's, and other jobs answer `404`. Jobs created
 before accounts existed have no owner, which reads as "visible to administrators
 and to the anonymous caller of an open deployment".
@@ -57,7 +57,7 @@ and to the anonymous caller of an open deployment".
   file path only after validation.
 - Failures store a truncated error summary; partial transfers may be kept for a retry.
 - On restart, unfinished jobs are marked failed rather than falsely reported as complete.
-- Terminal jobs expire after `FERRY_API_FILE_RETENTION_HOURS`: a sweeper deletes the
+- Terminal jobs expire after `ANNAS_API_FILE_RETENTION_HOURS`: a sweeper deletes the
   job directory and then the database row. Active jobs are never purged.
 
 ## Data boundaries

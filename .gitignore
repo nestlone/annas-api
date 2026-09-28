@@ -60,8 +60,8 @@ coverage.xml
 *.part
 *.crdownload
 
-# Ferry runtime caches & temp files
-.annas_ferry_cache/
+# annas-api runtime caches & temp files
+.annas_api_cache/
 temp/
 tmp/
 work/

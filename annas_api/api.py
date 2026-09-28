@@ -27,23 +27,23 @@ def _env_flag(name, default=False):
 
 class Settings:
     def __init__(self):
-        self.data_dir = Path(os.environ.get("FERRY_API_DATA_DIR", "./ferry-data"))
-        self.workers = max(1, min(int(os.environ.get("FERRY_API_WORKERS", "2")), 10))
-        self.api_token = os.environ.get("FERRY_API_TOKEN")
-        self.signing_key = os.environ.get("FERRY_API_SIGNING_KEY") or self.api_token or "development-only-change-me"
-        self.file_url_ttl = max(60, min(int(os.environ.get("FERRY_API_FILE_URL_TTL", "900")), 86400))
-        self.public_base_url = (os.environ.get("FERRY_API_PUBLIC_BASE_URL") or "").rstrip("/")
-        retention_hours = max(1, min(int(os.environ.get("FERRY_API_FILE_RETENTION_HOURS", "24")), 8760))
+        self.data_dir = Path(os.environ.get("ANNAS_API_DATA_DIR", "./annas-api-data"))
+        self.workers = max(1, min(int(os.environ.get("ANNAS_API_WORKERS", "2")), 10))
+        self.api_token = os.environ.get("ANNAS_API_TOKEN")
+        self.signing_key = os.environ.get("ANNAS_API_SIGNING_KEY") or self.api_token or "development-only-change-me"
+        self.file_url_ttl = max(60, min(int(os.environ.get("ANNAS_API_FILE_URL_TTL", "900")), 86400))
+        self.public_base_url = (os.environ.get("ANNAS_API_PUBLIC_BASE_URL") or "").rstrip("/")
+        retention_hours = max(1, min(int(os.environ.get("ANNAS_API_FILE_RETENTION_HOURS", "24")), 8760))
         self.retention_seconds = retention_hours * 3600
-        self.admin_username = os.environ.get("FERRY_ADMIN_USERNAME", "admin")
-        self.admin_password = os.environ.get("FERRY_ADMIN_PASSWORD")
-        self.token_username = os.environ.get("FERRY_TOKEN_USERNAME", "api-token")
-        self.registration_open = _env_flag("FERRY_REGISTRATION_OPEN", False)
-        session_hours = max(1, min(int(os.environ.get("FERRY_SESSION_TTL_HOURS", "168")), 8760))
+        self.admin_username = os.environ.get("ANNAS_API_ADMIN_USERNAME", "admin")
+        self.admin_password = os.environ.get("ANNAS_API_ADMIN_PASSWORD")
+        self.token_username = os.environ.get("ANNAS_API_TOKEN_USERNAME", "api-token")
+        self.registration_open = _env_flag("ANNAS_API_REGISTRATION_OPEN", False)
+        session_hours = max(1, min(int(os.environ.get("ANNAS_API_SESSION_TTL_HOURS", "168")), 8760))
         self.session_ttl_seconds = session_hours * 3600
         # Cookies are marked Secure whenever the service is reached over HTTPS.
         self.session_secure = _env_flag(
-            "FERRY_SESSION_SECURE", self.public_base_url.startswith("https://")
+            "ANNAS_API_SESSION_SECURE", self.public_base_url.startswith("https://")
         )
 
 
@@ -124,7 +124,7 @@ def create_app(settings=None):
         return request.app.state.jobs
 
     def base_url(request):
-        """Base for generated links; FERRY_API_PUBLIC_BASE_URL wins over the request.
+        """Base for generated links; ANNAS_API_PUBLIC_BASE_URL wins over the request.
 
         A reverse proxy that forwards its upstream address as the Host header
         would otherwise leak an unreachable internal URL to clients.

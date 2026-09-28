@@ -258,7 +258,7 @@ def bypass_ddos_guard(page, ocr=None):
 def run_doctor(fix=False):
     """Performs an extensive environment and network connectivity diagnosis."""
     print("=" * 65)
-    print("  [安娜书渡 / Anna's Archive Ferry] 环境与镜像诊断")
+    print("  [annas-api] 环境与镜像诊断")
     print("=" * 65)
     all_ok = True
     py_ver = sys.version.split()[0]

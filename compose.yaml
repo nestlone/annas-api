@@ -1,5 +1,7 @@
+name: annas-api
+
 services:
-  ferry-api:
+  annas-api:
     build: .
     ports:
       - "127.0.0.1:8000:8000"
@@ -7,7 +9,7 @@ services:
       - .env
     volumes:
       - ./annas_api:/app/annas_api:ro
-      - ferry-data:/data
+      - annas-api-data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz')"]
       interval: 30s
@@ -17,4 +19,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  ferry-data:
+  annas-api-data:

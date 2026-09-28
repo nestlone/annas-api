@@ -9,34 +9,34 @@ cp .env.example .env
 `.env` is git-ignored; keep it in a protected location.
 
 ```ini
-FERRY_API_TOKEN=replace-with-a-long-random-api-token
-FERRY_API_SIGNING_KEY=replace-with-a-different-long-random-signing-key
-FERRY_API_WORKERS=8
-FERRY_API_FILE_URL_TTL=900
-FERRY_API_FILE_RETENTION_HOURS=24
-FERRY_API_PUBLIC_BASE_URL=https://annas.nestlone.com
-FERRY_ADMIN_USERNAME=admin
-FERRY_ADMIN_PASSWORD=replace-with-a-strong-password
-FERRY_REGISTRATION_OPEN=0
-FERRY_SESSION_TTL_HOURS=168
+ANNAS_API_TOKEN=replace-with-a-long-random-api-token
+ANNAS_API_SIGNING_KEY=replace-with-a-different-long-random-signing-key
+ANNAS_API_WORKERS=8
+ANNAS_API_FILE_URL_TTL=900
+ANNAS_API_FILE_RETENTION_HOURS=24
+ANNAS_API_PUBLIC_BASE_URL=https://annas.nestlone.com
+ANNAS_API_ADMIN_USERNAME=admin
+ANNAS_API_ADMIN_PASSWORD=replace-with-a-strong-password
+ANNAS_API_REGISTRATION_OPEN=0
+ANNAS_API_SESSION_TTL_HOURS=168
 ```
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `FERRY_API_TOKEN` | yes | — | `X-API-Key` for management endpoints. |
-| `FERRY_API_SIGNING_KEY` | yes | — | HMAC key for download URLs; must differ from the token. |
-| `FERRY_API_WORKERS` | no | `2` | Local worker count, clamped to 1–10. |
-| `FERRY_API_FILE_URL_TTL` | no | `900` | Download-link lifetime, clamped to 60–86400 seconds. |
-| `FERRY_API_FILE_RETENTION_HOURS` | no | `24` | Hours a finished job and its file survive, clamped to 1–8760. |
-| `FERRY_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
-| `FERRY_API_PUBLIC_BASE_URL` | no | — | Base URL for the `status_url` and `download_url` links. Set it when the service sits behind a reverse proxy that does not forward the original `Host` header; unset, links are derived from the request. |
-| `FERRY_ADMIN_USERNAME` | no | `admin` | Console administrator, created on first start. |
-| `FERRY_ADMIN_PASSWORD` | no | — | Initial password for that administrator. Only *seeds* the account: a password changed in the console is not reverted on restart. Without it, the first account to register becomes the administrator. |
-| `FERRY_REGISTRATION_OPEN` | no | `0` | Seeds whether the console offers open registration. The administrator owns the setting afterwards. |
-| `FERRY_SESSION_TTL_HOURS` | no | `168` | Console session lifetime, clamped to 1–8760. |
-| `FERRY_TOKEN_USERNAME` | no | `api-token` | Account that `FERRY_API_TOKEN` is registered under. |
-| `FERRY_SESSION_SECURE` | no | HTTPS base URL | Force the `Secure` flag on the session cookie. |
-| `FERRY_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
+| `ANNAS_API_TOKEN` | yes | — | `X-API-Key` for management endpoints. |
+| `ANNAS_API_SIGNING_KEY` | yes | — | HMAC key for download URLs; must differ from the token. |
+| `ANNAS_API_WORKERS` | no | `2` | Local worker count, clamped to 1–10. |
+| `ANNAS_API_FILE_URL_TTL` | no | `900` | Download-link lifetime, clamped to 60–86400 seconds. |
+| `ANNAS_API_FILE_RETENTION_HOURS` | no | `24` | Hours a finished job and its file survive, clamped to 1–8760. |
+| `ANNAS_API_DATA_DIR` | no | `/data` | Job database and delivered files (container path). |
+| `ANNAS_API_PUBLIC_BASE_URL` | no | — | Base URL for the `status_url` and `download_url` links. Set it when the service sits behind a reverse proxy that does not forward the original `Host` header; unset, links are derived from the request. |
+| `ANNAS_API_ADMIN_USERNAME` | no | `admin` | Console administrator, created on first start. |
+| `ANNAS_API_ADMIN_PASSWORD` | no | — | Initial password for that administrator. Only *seeds* the account: a password changed in the console is not reverted on restart. Without it, the first account to register becomes the administrator. |
+| `ANNAS_API_REGISTRATION_OPEN` | no | `0` | Seeds whether the console offers open registration. The administrator owns the setting afterwards. |
+| `ANNAS_API_SESSION_TTL_HOURS` | no | `168` | Console session lifetime, clamped to 1–8760. |
+| `ANNAS_API_TOKEN_USERNAME` | no | `api-token` | Account that `ANNAS_API_TOKEN` is registered under. |
+| `ANNAS_API_SESSION_SECURE` | no | HTTPS base URL | Force the `Secure` flag on the session cookie. |
+| `ANNAS_API_PROXY_POOL_URL` | no | — | Rotating proxy-pool endpoint for CDN downloads. |
 
 Each worker starts its own browser process, so memory grows with the worker count;
 keep it at or below 8 on a 2 GB host. Recreate the container after changes:
@@ -50,10 +50,9 @@ sessions, quotas and usage counters live in the same SQLite file as the jobs
 (`/data/jobs.sqlite3`), opened in WAL mode so console writes and worker writes do
 not block each other.
 
-`FERRY_API_TOKEN` keeps working unchanged: on every start it is registered as an
-administrator key, so existing API clients and the bundled agent skill need no
-change. Jobs created before accounts existed have no owner and are visible only
-to administrators.
+`ANNAS_API_TOKEN` is registered as an administrator key on every start, so it
+can be used by API clients and the bundled agent skill. Jobs created before
+accounts existed have no owner and are visible only to administrators.
 
 Quotas are per user and per UTC day: `daily_searches` and `daily_downloads` are
 counted separately, and `max_concurrent_jobs` caps parallel work. Zero means
@@ -69,14 +68,14 @@ browser directory accordingly.
 
 ## CLI
 
-The CLI reads optional settings from `~/.annas_ferry/config.json`, falling back to
+The CLI reads optional settings from `~/.annas_api/config.json`, falling back to
 built-in defaults:
 
 ```json
 {
   "proxy": "auto",
   "proxy_bypass_hosts": ["annas-archive.gl"],
-  "default_download_dir": "~/Downloads/AnnasFerry",
+  "default_download_dir": "~/Downloads/AnnasAPI",
   "auto_convert_djvu": true,
   "headless": true
 }
@@ -88,14 +87,14 @@ intercepts traffic at the OS layer.
 
 ### Rotating proxy pool
 
-With `FERRY_PROXY_POOL_URL` set, **CDN downloads** egress through pool IPs. The
+With `ANNAS_API_PROXY_POOL_URL` set, **CDN downloads** egress through pool IPs. The
 browser (search and direct-link scraping) stays direct by default, because pool IPs
 are usually rejected by the mirror's DDoS-Guard challenge. The endpoint returns
 plain text (`wt=text`, `method=http`) such as `1.2.3.4:8080`, parsed as
 `http://1.2.3.4:8080`.
 
 ```ini
-FERRY_PROXY_POOL_URL=https://api.example.com/ip/get?appKey=KEY&appSecret=SECRET&cnt=&wt=text&method=http
+ANNAS_API_PROXY_POOL_URL=https://api.example.com/ip/get?appKey=KEY&appSecret=SECRET&cnt=&wt=text&method=http
 ```
 
 - Each acquisition returns a different exit IP; a single download keeps one IP and
@@ -109,14 +108,14 @@ FERRY_PROXY_POOL_URL=https://api.example.com/ip/get?appKey=KEY&appSecret=SECRET&
 
 ## Data retention
 
-The `ferry-data` volume holds:
+The `annas-api-data` volume holds:
 
 - `/data/jobs.sqlite3` — job state and error summaries.
 - `/data/downloads/` — validated, delivered files.
 
 A background sweeper runs at startup and every 10 minutes. Once a job has been in a
 terminal state (`completed`, `failed`, `cancelled`) for longer than
-`FERRY_API_FILE_RETENTION_HOURS`, it deletes the job directory and then the database
+`ANNAS_API_FILE_RETENTION_HOURS`, it deletes the job directory and then the database
 row. Queued and running jobs are never touched. After expiry, `GET /v1/jobs/{id}`
 returns `404` and the signed download URL stops resolving.
 

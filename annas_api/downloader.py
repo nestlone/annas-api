@@ -174,7 +174,7 @@ def download(url, output_dir, name=None, md5=None, proxy=None, proxy_provider=No
 def _fetch_to_partial(client, url, partial, metadata_path, identity, previous, md5, progress):
     """Perform one transfer attempt, appending to the .part file via Range resume."""
     offset = partial.stat().st_size if partial.exists() else 0
-    headers = {"User-Agent": "AnnaArchiveFerry"}
+    headers = {"User-Agent": "AnnasAPI"}
     if offset:
         headers["Range"] = f"bytes={offset}-"
         if previous and previous.get("validator"):

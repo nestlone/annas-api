@@ -10,6 +10,7 @@ from pathlib import Path
 
 from . import db
 from .security import (
+    API_KEY_PREFIX_LENGTH,
     generate_api_key,
     generate_session_token,
     hash_api_key,
@@ -95,7 +96,7 @@ class AccountStore:
             connection.close()
 
     def ensure_env_token(self, token, username="api-token"):
-        """Register ``FERRY_API_TOKEN`` as an admin key so existing clients keep working."""
+        """Register ``ANNAS_API_TOKEN`` as an admin key for API clients."""
         if not token:
             return None
         key_hash = hash_api_key(token)
@@ -127,7 +128,7 @@ class AccountStore:
                 connection.execute(
                     "INSERT INTO api_keys (user_id, name, key_prefix, key_hash, is_active, created_at) "
                     "VALUES (?, ?, ?, ?, 1, ?)",
-                    (user_id, ENV_TOKEN_NAME, token[:12], key_hash, now),
+                    (user_id, ENV_TOKEN_NAME, token[:API_KEY_PREFIX_LENGTH], key_hash, now),
                 )
                 connection.execute("COMMIT")
             except Exception:

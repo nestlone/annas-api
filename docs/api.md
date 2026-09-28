@@ -5,12 +5,12 @@ Base URL: `http://127.0.0.1:8000`. Interactive spec: `/docs`.
 Every endpoint except `GET /healthz` and the signed file endpoint requires an API key:
 
 ```http
-X-API-Key: <FERRY_API_TOKEN>
+X-API-Key: <ANNAS_API_TOKEN>
 ```
 
-`FERRY_API_TOKEN` is one such key. Per-user keys are issued from the web console
+`ANNAS_API_TOKEN` is one such key. Per-user keys are issued from the web console
 and behave identically — except that a regular user's key only reaches that
-user's own jobs, while `FERRY_API_TOKEN` and console administrators see every
+user's own jobs, while `ANNAS_API_TOKEN` and console administrators see every
 job. `GET /v1/jobs`, `GET /v1/jobs/{id}` and `POST /v1/jobs/{id}/cancel` return
 `404` for a job the caller does not own, so existence is not revealed.
 
@@ -76,7 +76,7 @@ The download URL is time-limited and needs no API key. Treat it as a sensitive
 temporary credential and keep it out of public logs.
 
 `status_url` and `download_url` are derived from the request's `Host` header
-unless `FERRY_API_PUBLIC_BASE_URL` is set, which takes precedence. Set it when
+unless `ANNAS_API_PUBLIC_BASE_URL` is set, which takes precedence. Set it when
 the service runs behind a reverse proxy that rewrites `Host`, otherwise clients
 receive links carrying the proxy's upstream address.
 
@@ -139,7 +139,7 @@ Cancels a job that has not started. A `running` job cannot be interrupted.
 ## Example
 
 ```bash
-TOKEN=$FERRY_API_TOKEN
+TOKEN=$ANNAS_API_TOKEN
 curl -X POST http://127.0.0.1:8000/v1/search \
   -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"example title","limit":5}'
@@ -150,7 +150,7 @@ curl -X POST -H "X-API-Key: $TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>/cance
 ## Web console endpoints
 
 The console is a static page served at `/`, backed by these JSON endpoints.
-Authentication is a `ferry_session` cookie (HttpOnly, SameSite=Lax), set by
+Authentication is a `annas_api_session` cookie (HttpOnly, SameSite=Lax), set by
 login and cleared by logout; none of them accept `X-API-Key`.
 
 | Method | Path | Auth | Purpose |

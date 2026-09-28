@@ -26,14 +26,18 @@
 
 需要 Docker 与 Compose 插件。
 
+> **命名调整：** 配置统一使用 `ANNAS_API_*`，Compose 服务名为 `annas-api`，
+> 新签发的 API Key 以 `annas_` 开头。新部署请从当前 `.env.example` 创建配置；
+> 不再支持旧变量名。
+
 ```bash
-cp .env.example .env   # 设置 FERRY_API_TOKEN、FERRY_API_SIGNING_KEY 与 FERRY_ADMIN_PASSWORD
+cp .env.example .env   # 设置 ANNAS_API_TOKEN、ANNAS_API_SIGNING_KEY 与 ANNAS_API_ADMIN_PASSWORD
 docker compose up --build -d
 curl http://127.0.0.1:8000/healthz
 ```
 
-随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `FERRY_ADMIN_USERNAME` /
-`FERRY_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
+随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `ANNAS_API_ADMIN_USERNAME` /
+`ANNAS_API_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
 
 服务仅绑定 `127.0.0.1:8000`。交互式 OpenAPI 文档：<http://127.0.0.1:8000/docs>。
 
@@ -45,11 +49,11 @@ curl http://127.0.0.1:8000/healthz
 ```bash
 docker compose up --build -d  # 首次
 git pull --ff-only
-docker compose restart ferry-api
+docker compose restart annas-api
 curl http://127.0.0.1:8000/healthz
 ```
 
-数据仍保存在 `ferry-data` 卷中。`pyproject.toml`、依赖或 `Dockerfile` 变化时
+数据仍保存在 `annas-api-data` 卷中。`pyproject.toml`、依赖或 `Dockerfile` 变化时
 仍需带 `--build` 重建镜像；生产环境不要使用 `--reload`。
 
 ## 用法
@@ -57,13 +61,13 @@ curl http://127.0.0.1:8000/healthz
 ```bash
 # 提交检索。
 curl -X POST http://127.0.0.1:8000/v1/search \
-  -H "X-API-Key: $FERRY_API_TOKEN" -H 'Content-Type: application/json' \
+  -H "X-API-Key: $ANNAS_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"example title","limit":5}'
 
 # 查询任务、查看队列、取消排队中的任务。
-curl -H "X-API-Key: $FERRY_API_TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>
-curl -H "X-API-Key: $FERRY_API_TOKEN" 'http://127.0.0.1:8000/v1/jobs?status=queued'
-curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
+curl -H "X-API-Key: $ANNAS_API_TOKEN" http://127.0.0.1:8000/v1/jobs/<job-id>
+curl -H "X-API-Key: $ANNAS_API_TOKEN" 'http://127.0.0.1:8000/v1/jobs?status=queued'
+curl -X POST -H "X-API-Key: $ANNAS_API_TOKEN" \
   http://127.0.0.1:8000/v1/jobs/<job-id>/cancel
 ```
 
@@ -75,17 +79,17 @@ curl -X POST -H "X-API-Key: $FERRY_API_TOKEN" \
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `FERRY_API_TOKEN` | — | 管理接口的 `X-API-Key`（必填）。 |
-| `FERRY_API_SIGNING_KEY` | — | 下载链接的 HMAC 密钥（必填，须不同于 Token）。 |
-| `FERRY_API_WORKERS` | `2` | 本地 Worker 数，限制为 1–10。 |
-| `FERRY_API_FILE_URL_TTL` | `900` | 下载链接有效秒数（60–86400）。 |
-| `FERRY_API_FILE_RETENTION_HOURS` | `24` | 任务完成后文件与记录的保留小时数（1–8760）。 |
-| `FERRY_API_PUBLIC_BASE_URL` | — | `status_url`/`download_url` 的基地址；反向代理改写 `Host` 时需设置。 |
-| `FERRY_ADMIN_USERNAME` | `admin` | 控制台管理员账号，首次启动时创建。 |
-| `FERRY_ADMIN_PASSWORD` | — | 该管理员的初始密码；不设置则由第一个注册者成为管理员。 |
-| `FERRY_REGISTRATION_OPEN` | `0` | 是否开放注册的初始值。 |
-| `FERRY_SESSION_TTL_HOURS` | `168` | 控制台会话有效期。 |
-| `FERRY_PROXY_POOL_URL` | — | 可选的轮换代理池地址，用于 CDN 下载。 |
+| `ANNAS_API_TOKEN` | — | 管理接口的 `X-API-Key`（必填）。 |
+| `ANNAS_API_SIGNING_KEY` | — | 下载链接的 HMAC 密钥（必填，须不同于 Token）。 |
+| `ANNAS_API_WORKERS` | `2` | 本地 Worker 数，限制为 1–10。 |
+| `ANNAS_API_FILE_URL_TTL` | `900` | 下载链接有效秒数（60–86400）。 |
+| `ANNAS_API_FILE_RETENTION_HOURS` | `24` | 任务完成后文件与记录的保留小时数（1–8760）。 |
+| `ANNAS_API_PUBLIC_BASE_URL` | — | `status_url`/`download_url` 的基地址；反向代理改写 `Host` 时需设置。 |
+| `ANNAS_API_ADMIN_USERNAME` | `admin` | 控制台管理员账号，首次启动时创建。 |
+| `ANNAS_API_ADMIN_PASSWORD` | — | 该管理员的初始密码；不设置则由第一个注册者成为管理员。 |
+| `ANNAS_API_REGISTRATION_OPEN` | `0` | 是否开放注册的初始值。 |
+| `ANNAS_API_SESSION_TTL_HOURS` | `168` | 控制台会话有效期。 |
+| `ANNAS_API_PROXY_POOL_URL` | — | 可选的轮换代理池地址，用于 CDN 下载。 |
 
 详见[配置](docs/configuration.md)。
 

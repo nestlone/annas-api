@@ -10,7 +10,7 @@ def fake_settings(data_dir, **overrides):
         data_dir=Path(data_dir),
         workers=1,
         # Unset by default so a fresh fixture really is a fresh deployment;
-        # tests that exercise the legacy token pass it explicitly.
+        # Tests that exercise the environment token pass it explicitly.
         api_token=None,
         signing_key="secret",
         file_url_ttl=300,

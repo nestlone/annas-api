@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-SESSION_COOKIE = "ferry_session"
+SESSION_COOKIE = "annas_api_session"
 MAX_KEYS_PER_USER = 20
 MIN_PASSWORD_LENGTH = 8
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")

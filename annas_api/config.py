@@ -1,5 +1,5 @@
 """
-Configuration management for Anna's Archive Ferry.
+Configuration management for annas-api.
 Decouples runtime persistent state from package source directories.
 """
 
@@ -8,9 +8,9 @@ import json
 from pathlib import Path
 
 # User persistent runtime paths
-USER_CONFIG_DIR = Path.home() / ".annas_ferry"
+USER_CONFIG_DIR = Path.home() / ".annas_api"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "config.json"
-CACHE_DIR = Path.home() / ".annas_ferry_cache"
+CACHE_DIR = Path.home() / ".annas_api_cache"
 
 def ensure_user_dirs():
     """Lazily and safely ensures user config and cache directories exist."""
@@ -36,7 +36,7 @@ DEFAULT_CONFIG = {
     # External rotating proxy pool. When ``proxy_pool_url`` is set it takes
     # precedence over ``proxy``/``proxy_bypass_hosts`` for all outbound traffic
     # (browser and downloads). The URL carries provider credentials, so it is
-    # supplied through FERRY_PROXY_POOL_URL rather than committed to config.
+    # supplied through ANNAS_API_PROXY_POOL_URL rather than committed to config.
     "proxy_pool_url": "",
     "proxy_pool_scheme": "http",
     # Pool IPs typically fail the mirror's DDoS-Guard challenge, so browser
@@ -51,7 +51,7 @@ DEFAULT_CONFIG = {
         "shadowlibraries.github.io",
         "open-slum.pages.dev"
     ],
-    "default_download_dir": "~/Downloads/AnnasFerry",
+    "default_download_dir": "~/Downloads/AnnasAPI",
     "auto_convert_djvu": True,
     "headless": True
 }
@@ -63,7 +63,7 @@ def get_default_config():
 def load_config(custom_path=None, expand_paths=True):
     """Loads configuration with fallback hierarchy:
     1. custom_path (if provided and exists)
-    2. USER_CONFIG_FILE (~/.annas_ferry/config.json)
+    2. USER_CONFIG_FILE (~/.annas_api/config.json)
     3. DEFAULT_CONFIG
     """
     cfg = get_default_config()
@@ -85,17 +85,17 @@ def load_config(custom_path=None, expand_paths=True):
                 pass
 
     if expand_paths:
-        raw_dir = cfg.get("default_download_dir", "~/Downloads/AnnasFerry")
+        raw_dir = cfg.get("default_download_dir", "~/Downloads/AnnasAPI")
         cfg["default_download_dir"] = str(Path(os.path.expandvars(os.path.expanduser(raw_dir))))
 
     # Secrets live in the environment (e.g. docker env_file), never in config files.
-    pool_url = os.environ.get("FERRY_PROXY_POOL_URL")
+    pool_url = os.environ.get("ANNAS_API_PROXY_POOL_URL")
     if pool_url:
         cfg["proxy_pool_url"] = pool_url.strip()
     return cfg
 
 def save_dynamic_config(updates):
-    """Safely updates dynamic configuration into ~/.annas_ferry/config.json."""
+    """Safely updates dynamic configuration into ~/.annas_api/config.json."""
     ensure_user_dirs()
     # Load raw config without path expansion to preserve portable ~ paths
     current = load_config(expand_paths=False)
