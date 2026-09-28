@@ -50,6 +50,9 @@ Then open `http://127.0.0.1:8000/` for the web console and log in with
 The service binds to `127.0.0.1:8000` only. Interactive OpenAPI docs:
 <http://127.0.0.1:8000/docs>.
 
+The container uses the fixed address `172.20.0.12` on `annas-api-net`, which
+can be configured as an upstream for a reverse proxy on the same Docker network.
+
 ### Production updates
 
 `compose.yaml` mounts `annas_api/` read-only by default, so application code
