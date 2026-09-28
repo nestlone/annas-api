@@ -41,6 +41,7 @@ CONFIG = load_config()
 
 # Distinguishes "no proxy override supplied" from an explicit None (direct).
 _UNSET = object()
+DIRECT_LINK_TIMEOUT_SECONDS = 150
 
 def log_info(msg, as_json=False):
     """Prints informational logs. If as_json is True, redirects to stderr to keep stdout 100% JSON-parseable."""
@@ -452,7 +453,7 @@ def search_books(query, ext=None, limit=10, as_json=False):
     print("下载指令: annas-api download --md5 <MD5值>\n")
     return results
 
-def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
+def resolve_direct_url(md5, quiet=False, proxy=_UNSET, timeout_seconds=DIRECT_LINK_TIMEOUT_SECONDS):
     """Sniffs the direct CDN download URL and handles cookie pre-warming.
 
     ``proxy`` pins the browser to one exit IP so the resolved link and the
@@ -460,6 +461,13 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
     """
     from .downloader import validate_md5, validate_public_https
     validate_md5(md5)
+    timeout_seconds = max(30, min(int(timeout_seconds), 300))
+    deadline = time.monotonic() + timeout_seconds
+
+    def remaining_ms(cap_ms):
+        """Keep every browser operation within one end-to-end budget."""
+        remaining = int((deadline - time.monotonic()) * 1000)
+        return min(cap_ms, max(0, remaining))
     cache_file = CACHE_DIR / f"{md5}.url"
     import requests
     pinned = None if proxy is _UNSET else proxy
@@ -472,7 +480,12 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
                 if cached_url.startswith("https://"):
                     validate_public_https(cached_url)
                     head_proxies = {"http": pinned, "https": pinned} if pinned else request_proxies(cached_url)
-                    r = requests.head(cached_url, proxies=head_proxies, timeout=5.0, verify=True)
+                    r = requests.head(
+                        cached_url,
+                        proxies=head_proxies,
+                        timeout=min(5.0, max(1.0, deadline - time.monotonic())),
+                        verify=True,
+                    )
                     if r.status_code in (200, 206, 302):
                         log_info(f"[+] 命中缓存的有效直链: {cached_url[:70]}...", as_json=quiet)
                         return cached_url
@@ -486,6 +499,7 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
     proxy_server = resolve_proxy(mirror, browser=True) if proxy is _UNSET else proxy
 
     launch_args = browser_launch_args()
+    launch_args["timeout"] = min(30_000, remaining_ms(30_000))
     if proxy_server:
         launch_args["proxy"] = {"server": proxy_server}
 
@@ -497,6 +511,9 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
 
     cdn_url = None
     with sync_playwright() as p:
+        if remaining_ms(1) <= 0:
+            log_info("[!] 获取下载直链超时。", as_json=quiet)
+            return None
         browser = p.chromium.launch(**launch_args)
         try:
             context = browser.new_context(
@@ -507,21 +524,31 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
             # Pre-warm homepage to acquire cookies and pass DDoS challenges cleanly
             log_info(f"[*] 预热主站安全信标: {mirror} ...", as_json=quiet)
             try:
-                page.goto(mirror, wait_until="domcontentloaded", timeout=35000)
+                page.goto(
+                    mirror,
+                    wait_until="domcontentloaded",
+                    timeout=remaining_ms(35000),
+                )
                 if not bypass_ddos_guard(page, ocr=ocr):
                     log_info("[!] 主站预热未通过安全防护，继续尝试下载页面。", as_json=quiet)
             except Exception:
                 pass
 
             for route in slow_routes:
+                if remaining_ms(1) <= 0:
+                    break
                 log_info(f"[*] 进入慢速免登录通道: {route} ...", as_json=quiet)
                 try:
-                    page.goto(route, wait_until="domcontentloaded", timeout=45000)
+                    page.goto(
+                        route,
+                        wait_until="domcontentloaded",
+                        timeout=remaining_ms(45000),
+                    )
                     if not bypass_ddos_guard(page, ocr=ocr):
                         continue
 
-                    for _ in range(40):
-                        page.wait_for_timeout(2000)
+                    while remaining_ms(1) > 0:
+                        page.wait_for_timeout(min(2000, remaining_ms(2000)))
                         try:
                             links = page.query_selector_all("a")
                             for a in links:
@@ -560,6 +587,11 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
             cache_file.write_text(cdn_url, encoding="utf-8")
         except Exception:
             pass
+    elif time.monotonic() >= deadline:
+        log_info(
+            f"[!] 获取下载直链超时（{timeout_seconds} 秒）；请检查上游站点或代理。",
+            as_json=quiet,
+        )
     return cdn_url
 
 def probe_book(md5, as_json=False):
@@ -642,7 +674,9 @@ def download_book(md5=None, direct_url=None, output_dir=None, custom_filename=No
     browser_proxy = job_proxy if (pool and CONFIG.get("proxy_pool_browser", False)) else _UNSET
     cdn_url = direct_url or resolve_direct_url(md5, quiet=quiet, proxy=browser_proxy)
     if not cdn_url:
-        raise RuntimeError("无法获取下载地址")
+        raise RuntimeError(
+            f"无法在 {DIRECT_LINK_TIMEOUT_SECONDS} 秒内获取下载地址；请检查上游站点或代理。"
+        )
     destination_dir = output_dir or CONFIG.get("default_download_dir")
     result = download(
         cdn_url,
