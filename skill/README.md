@@ -37,13 +37,18 @@ the repository's "latest release". Install a pinned version — the archive
 contains a top-level `annas-api/` folder:
 
 ```bash
-VERSION=1.0.0
+VERSION=1.0.3
 BASE=https://github.com/nestlone/annas-api/releases/download/skill-v$VERSION
-curl -L -o annas-api-skill.zip "$BASE/annas-api-skill-$VERSION.zip"
-curl -L -o annas-api-skill.zip.sha256 "$BASE/annas-api-skill-$VERSION.zip.sha256"
-sha256sum -c annas-api-skill.zip.sha256
-unzip annas-api-skill.zip -d ~/.claude/skills/
+curl -L -o "annas-api-skill-$VERSION.zip" "$BASE/annas-api-skill-$VERSION.zip"
+curl -L -o "annas-api-skill-$VERSION.zip.sha256" "$BASE/annas-api-skill-$VERSION.zip.sha256"
+sha256sum -c "annas-api-skill-$VERSION.zip.sha256"
+unzip "annas-api-skill-$VERSION.zip" -d ~/.claude/skills/
 ```
+
+Keep the version in the local filename: the checksum file records the name it
+was generated for, so `sha256sum -c` only matches when the two agree. Each
+release also carries a stable-named `annas-api-skill.zip` with a matching
+`annas-api-skill.zip.sha256` if you prefer a fixed filename.
 
 Set the API key in the agent's environment before use:
 
