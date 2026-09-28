@@ -63,6 +63,9 @@ def cmd_search(client, args):
 def cmd_download(client, args):
     if bool(args.md5) == bool(args.url):
         raise SystemExit("error: provide exactly one of --md5 or --url")
+    if args.save and not args.wait:
+        raise SystemExit("error: --save needs --wait, since the file URL only "
+                         "exists once the job completes")
     job = client.download(md5=args.md5, direct_url=args.url, name=args.name)
     if args.wait:
         job = client.wait(job["id"], timeout=args.timeout, on_poll=_progress)
@@ -94,25 +97,42 @@ def cmd_update(client, args):
     return report
 
 
+def _common_options():
+    """Flags accepted both before and after the subcommand.
+
+    ``default=SUPPRESS`` keeps the subparser from clobbering a value that the
+    top-level parser already consumed.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--base-url", default=argparse.SUPPRESS,
+                        help="service root (default: {} or $ANNAS_API_BASE_URL)".format(
+                            DEFAULT_BASE_URL))
+    parser.add_argument("--token", default=argparse.SUPPRESS,
+                        help="API key; overrides ANNAS_API_TOKEN")
+    parser.add_argument("--token-file", default=argparse.SUPPRESS,
+                        help="read the API key from this file")
+    parser.add_argument("--http-timeout", type=float, default=argparse.SUPPRESS,
+                        help="per-request timeout in seconds (default: 60)")
+    parser.add_argument("--pretty", action="store_true", default=argparse.SUPPRESS,
+                        help="indent the JSON output")
+    return parser
+
+
 def build_parser():
+    common = _common_options()
     parser = argparse.ArgumentParser(
         prog="annas-cli",
         description="Client for an annas-api deployment.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
+        parents=[common],
     )
-    parser.add_argument("--base-url", default=os.environ.get("ANNAS_API_BASE_URL", DEFAULT_BASE_URL),
-                        help="service root (default: %(default)s)")
-    parser.add_argument("--token", default=None, help="API key; overrides ANNAS_API_TOKEN")
-    parser.add_argument("--token-file", default=None, help="read the API key from this file")
-    parser.add_argument("--http-timeout", type=float, default=60, help="per-request timeout (s)")
-    parser.add_argument("--pretty", action="store_true", help="indent the JSON output")
-
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("health", help="check service liveness").set_defaults(func=cmd_health)
+    sub.add_parser("health", parents=[common],
+                   help="check service liveness").set_defaults(func=cmd_health)
 
-    p = sub.add_parser("search", help="enqueue a catalog search")
+    p = sub.add_parser("search", parents=[common], help="enqueue a catalog search")
     p.add_argument("query")
     p.add_argument("--ext", default=None, help="format filter, e.g. epub")
     p.add_argument("--limit", type=int, default=10, help="1-50 (default: %(default)s)")
@@ -120,7 +140,8 @@ def build_parser():
     p.add_argument("--timeout", type=float, default=600, help="poll budget in seconds")
     p.set_defaults(func=cmd_search)
 
-    p = sub.add_parser("download", help="enqueue a download from an md5 or direct URL")
+    p = sub.add_parser("download", parents=[common],
+                       help="enqueue a download from an md5 or direct URL")
     p.add_argument("--md5", default=None, help="32-character hex digest")
     p.add_argument("--url", default=None, help="public HTTPS direct URL")
     p.add_argument("--name", default=None, help="optional filename hint")
@@ -129,22 +150,23 @@ def build_parser():
     p.add_argument("--save", default=None, help="with --wait, save the file to this path/dir")
     p.set_defaults(func=cmd_download)
 
-    p = sub.add_parser("job", help="show one job")
+    p = sub.add_parser("job", parents=[common], help="show one job")
     p.add_argument("job_id")
     p.set_defaults(func=cmd_job)
 
-    p = sub.add_parser("jobs", help="list jobs, newest first")
+    p = sub.add_parser("jobs", parents=[common], help="list jobs, newest first")
     p.add_argument("--status", default=None,
                    choices=["queued", "running", "completed", "failed", "cancelled"])
     p.add_argument("--limit", type=int, default=50, help="1-100 (default: %(default)s)")
     p.add_argument("--offset", type=int, default=0)
     p.set_defaults(func=cmd_jobs)
 
-    p = sub.add_parser("cancel", help="cancel a queued job")
+    p = sub.add_parser("cancel", parents=[common], help="cancel a queued job")
     p.add_argument("job_id")
     p.set_defaults(func=cmd_cancel)
 
-    p = sub.add_parser("update", help="check whether a newer skill release exists")
+    p = sub.add_parser("update", parents=[common],
+                       help="check whether a newer skill release exists")
     p.add_argument("--repo", default="nestlone/annas-api")
     p.add_argument("--quiet", action="store_true", help="suppress the stderr notice")
     p.set_defaults(func=cmd_update)
@@ -152,8 +174,19 @@ def build_parser():
     return parser
 
 
+def _apply_defaults(args):
+    """Fill in the flags the parsers suppressed when they were absent."""
+    args.base_url = getattr(args, "base_url", None) or os.environ.get(
+        "ANNAS_API_BASE_URL", DEFAULT_BASE_URL)
+    args.token = getattr(args, "token", None)
+    args.token_file = getattr(args, "token_file", None)
+    args.http_timeout = getattr(args, "http_timeout", 60)
+    args.pretty = getattr(args, "pretty", False)
+    return args
+
+
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    args = _apply_defaults(build_parser().parse_args(argv))
     client = _build_client(args)
     try:
         _emit(args.func(client, args), args.pretty)

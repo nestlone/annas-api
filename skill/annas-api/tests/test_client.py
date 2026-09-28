@@ -8,6 +8,8 @@ Run from the repository root::
     python -m unittest discover -s skill/annas-api/tests -v
 """
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -25,6 +27,7 @@ SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import check_update  # noqa: E402
+import annas_cli  # noqa: E402
 from annas_client import AnnasApiError, AnnasClient  # noqa: E402
 
 API_KEY = "test-token"
@@ -354,6 +357,81 @@ class UpdateCheckTests(StubServerCase):
     def test_raw_version_source_rejects_garbage(self):
         with self.assertRaises(check_update.UpdateCheckError):
             check_update.check_for_update(version_url=self.base + "/VERSION-garbage")
+
+
+class CliTests(StubServerCase):
+    def run_cli(self, argv):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = annas_cli.main(argv)
+        self.stderr = stderr.getvalue()          # assertions can inspect diagnostics
+        return code, stdout.getvalue()
+
+    def test_global_flags_work_after_the_subcommand(self):
+        code, out = self.run_cli(["--base-url", self.base, "--token", API_KEY,
+                                  "jobs", "--pretty"])
+        self.assertEqual(code, 0)
+        self.assertIn("\n  ", out)                       # --pretty did apply
+        self.assertEqual(json.loads(out)["count"], 0)
+
+    def test_global_flags_work_before_the_subcommand(self):
+        code, out = self.run_cli(["jobs", "--base-url", self.base, "--token", API_KEY])
+        self.assertEqual(code, 0)
+        self.assertNotIn("\n  ", out)                    # compact by default
+        self.assertEqual(json.loads(out)["count"], 0)
+
+    def test_search_command_emits_the_submitted_job(self):
+        code, out = self.run_cli(["search", "Ulysses", "--ext", "epub", "--limit", "2",
+                                  "--wait", "--base-url", self.base, "--token", API_KEY])
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["status"], "completed")
+        self.assertEqual(payload["result"][0]["title"], "Ulysses")
+
+    def test_health_command_needs_no_token(self):
+        code, out = self.run_cli(["health", "--base-url", self.base])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out), {"status": "ok"})
+
+    def test_token_file_is_read(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".token", delete=False) as handle:
+            handle.write(API_KEY + "\n")
+            path = handle.name
+        self.addCleanup(os.unlink, path)
+        code, out = self.run_cli(["jobs", "--base-url", self.base, "--token-file", path])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["count"], 0)
+
+    def test_cancel_unknown_job_exits_nonzero(self):
+        code, out = self.run_cli(["cancel", "nope", "--base-url", self.base,
+                                  "--token", API_KEY])
+        self.assertEqual(code, annas_cli.EXIT_API_ERROR)
+        self.assertEqual(out, "")
+
+    def test_unknown_status_is_a_usage_error(self):
+        with self.assertRaises(SystemExit):
+            self.run_cli(["jobs", "--status", "bogus", "--base-url", self.base,
+                          "--token", API_KEY])
+
+    def test_bad_credentials_surface_the_status_code(self):
+        code, out = self.run_cli(["jobs", "--base-url", self.base, "--token", "wrong"])
+        self.assertEqual(code, annas_cli.EXIT_API_ERROR)
+        self.assertEqual(out, "")
+        self.assertIn("status=401", self.stderr)
+
+    def test_save_without_wait_is_rejected(self):
+        with self.assertRaises(SystemExit):
+            self.run_cli(["download", "--md5", "a" * 32, "--save", "./books",
+                          "--base-url", self.base, "--token", API_KEY])
+
+    def test_download_with_save_writes_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = self.run_cli(["download", "--md5", "bcdcd8bd16771a4f03c71b89a490dd53",
+                                      "--wait", "--save", tmp,
+                                      "--base-url", self.base, "--token", API_KEY])
+            self.assertEqual(code, 0)
+            saved = json.loads(out)["saved_to"]
+            self.assertEqual(Path(saved).read_bytes(), FILE_BYTES)
 
 
 if __name__ == "__main__":

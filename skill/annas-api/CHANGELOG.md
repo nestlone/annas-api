@@ -6,6 +6,21 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-28
+
+### Fixed
+
+- The client flags (`--base-url`, `--token`, `--token-file`, `--http-timeout`,
+  `--pretty`) are now accepted on either side of the subcommand, so
+  `annas_cli.py jobs --pretty` no longer fails with an argument error.
+- `annas_cli.py download --save` without `--wait` is rejected with a clear
+  message instead of silently doing nothing.
+
+### Added
+
+- Offline tests for the CLI, including argument position, token files, exit
+  codes, and saving a downloaded file.
+
 ## [1.0.1] - 2026-09-28
 
 ### Fixed
@@ -37,6 +52,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `skill-v*` GitHub release and reports whether an update is available.
 - `tests/test_client.py` — offline tests backed by a standard-library HTTP stub.
 
-[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.1...HEAD
+[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.2...HEAD
+[1.0.2]: https://github.com/nestlone/annas-api/compare/skill-v1.0.1...skill-v1.0.2
 [1.0.1]: https://github.com/nestlone/annas-api/compare/skill-v1.0.0...skill-v1.0.1
 [1.0.0]: https://github.com/nestlone/annas-api/releases/tag/skill-v1.0.0

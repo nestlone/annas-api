@@ -10,6 +10,10 @@ export ANNAS_API_BASE_URL=https://annas.nestlone.com
 # staging: export ANNAS_API_BASE_URL=http://203.0.113.10:8000
 ```
 
+Client flags (`--base-url`, `--token`, `--token-file`, `--http-timeout`,
+`--pretty`) are accepted on either side of the subcommand, so
+`annas_cli.py jobs --pretty` and `annas_cli.py --pretty jobs` are equivalent.
+
 ## 1. Verify connectivity
 
 ```bash
