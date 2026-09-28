@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .accounts import AccountStore, QuotaExceeded
-from .jobs import JobService
+from .browser import browser_runtime_error
+from .jobs import BrowserUnavailable, JobService
 from .web import SESSION_COOKIE, create_web_router, static_dir
 
 
@@ -45,6 +46,7 @@ class Settings:
         self.session_secure = _env_flag(
             "ANNAS_API_SESSION_SECURE", self.public_base_url.startswith("https://")
         )
+        self.browser_error = browser_runtime_error()
 
 
 class Identity:
@@ -83,7 +85,10 @@ def create_app(settings=None):
     @asynccontextmanager
     async def lifespan(app):
         jobs = JobService(
-            settings.data_dir, settings.workers, retention_seconds=settings.retention_seconds
+            settings.data_dir,
+            settings.workers,
+            retention_seconds=settings.retention_seconds,
+            browser_error=getattr(settings, "browser_error", None),
         )
         accounts.migrate()
         accounts.bootstrap_admin(
@@ -167,6 +172,15 @@ def create_app(settings=None):
 
     @app.get("/healthz")
     def health():
+        if app.state.jobs.browser_error:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "degraded",
+                    "browser": "unavailable",
+                    "detail": app.state.jobs.browser_error,
+                },
+            )
         return {"status": "ok"}
 
     @app.post("/v1/search", status_code=status.HTTP_202_ACCEPTED)
@@ -177,6 +191,8 @@ def create_app(settings=None):
             job_id = jobs.submit_search(body.query, body.ext, body.limit, owner_id=caller.id)
         except QuotaExceeded as exc:
             raise HTTPException(status_code=429, detail=str(exc)) from exc
+        except BrowserUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}
@@ -191,6 +207,8 @@ def create_app(settings=None):
             )
         except QuotaExceeded as exc:
             raise HTTPException(status_code=429, detail=str(exc)) from exc
+        except BrowserUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"id": job_id, "status": "queued", "status_url": base_url(request) + f"/v1/jobs/{job_id}"}

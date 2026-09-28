@@ -70,7 +70,11 @@ docker compose up --build -d
 ```
 
 Browser files must be downloaded by the matching project image on Linux x86_64.
-Do not mix files from Windows, macOS, or another Playwright version.
+Do not mix files from Windows, macOS, or another Playwright version. Upload the
+whole generated directory, including both `chromium-<revision>` and
+`chromium_headless_shell-<revision>`; uploading only Chrome's archive is not
+sufficient. The service reports `/healthz` as `503` and rejects new browser jobs
+with a clear error until that headless-shell executable is present.
 
 Then open `http://127.0.0.1:8000/` for the web console and log in with
 `ANNAS_API_ADMIN_USERNAME` / `ANNAS_API_ADMIN_PASSWORD` — see [Web console](docs/web.md).

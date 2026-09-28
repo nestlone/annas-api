@@ -18,14 +18,19 @@ DEFAULT_RETENTION_SECONDS = 24 * 60 * 60
 SWEEP_INTERVAL_SECONDS = 10 * 60
 
 
+class BrowserUnavailable(RuntimeError):
+    """Raised before a browser-dependent job is inserted into the queue."""
+
+
 class JobService:
     """SQLite-backed jobs executed by a bounded local worker pool."""
 
-    def __init__(self, data_dir, workers=2, retention_seconds=DEFAULT_RETENTION_SECONDS):
+    def __init__(self, data_dir, workers=2, retention_seconds=DEFAULT_RETENTION_SECONDS, browser_error=None):
         self.data_dir = Path(data_dir).resolve()
         self.download_dir = self.data_dir / "downloads"
         self.database = self.data_dir / "jobs.sqlite3"
         self.retention_seconds = retention_seconds
+        self.browser_error = browser_error
         # Assigned by create_app once the account store exists; None disables
         # quota enforcement entirely (anonymous / single-token deployments).
         self.quota = None
@@ -113,6 +118,7 @@ class JobService:
             raise ValueError("检索关键词不能为空")
         if not 1 <= limit <= 50:
             raise ValueError("limit 必须在 1 到 50 之间")
+        self._require_browser()
         return self._submit(
             "search", {"query": query.strip(), "ext": ext, "limit": limit}, owner_id=owner_id
         )
@@ -122,6 +128,7 @@ class JobService:
             raise ValueError("必须且只能提供 md5 或 direct_url")
         if md5:
             validate_md5(md5)
+            self._require_browser()
         if direct_url:
             validate_public_https(direct_url)
         return self._submit(
@@ -129,6 +136,10 @@ class JobService:
             {"md5": md5, "direct_url": direct_url, "name": name},
             owner_id=owner_id,
         )
+
+    def _require_browser(self):
+        if self.browser_error:
+            raise BrowserUnavailable(self.browser_error)
 
     def _submit(self, kind, payload, owner_id=None):
         job_id = uuid.uuid4().hex

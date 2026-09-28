@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from annas_api.api import create_app
-from annas_api.jobs import JobService
+from annas_api.jobs import BrowserUnavailable, JobService
 
 
 class JobServiceTests(unittest.TestCase):
@@ -43,6 +43,27 @@ class JobServiceTests(unittest.TestCase):
             job = self.wait_for(job_id)
         self.assertEqual(job["status"], "completed")
         self.assertEqual(job["result"], [{"title": "Example"}])
+
+    def test_browser_dependent_jobs_are_rejected_before_queueing(self):
+        self.jobs.browser_error = "browser is unavailable"
+        with self.assertRaises(BrowserUnavailable):
+            self.jobs.submit_search("example")
+        with self.assertRaises(BrowserUnavailable):
+            self.jobs.submit_download(md5="0" * 32)
+        self.assertEqual(self.jobs.list_jobs(), [])
+
+    def test_direct_url_download_does_not_require_browser(self):
+        self.jobs.browser_error = "browser is unavailable"
+        def fake_download(**kwargs):
+            target = Path(kwargs["output_dir"]) / "book.pdf"
+            target.write_bytes(b"content")
+            return str(target)
+
+        with patch("annas_api.jobs.validate_public_https"), patch(
+            "annas_api.jobs.download_book", side_effect=fake_download
+        ):
+            job_id = self.jobs.submit_download(direct_url="https://download.example/book.pdf")
+            self.assertEqual(self.wait_for(job_id)["status"], "completed")
 
     def test_download_job_serves_only_its_own_file(self):
         def fake_download(**kwargs):
@@ -208,6 +229,16 @@ class ApiTests(unittest.TestCase):
                         break
                     time.sleep(0.01)
                 self.assertEqual(response.json()["result"], [])
+
+    def test_browser_error_is_reported_as_service_unavailable(self):
+        self.settings.browser_error = "browser is unavailable"
+        with TestClient(create_app(self.settings)) as client:
+            health = client.get("/healthz")
+            self.assertEqual(health.status_code, 503)
+            self.assertEqual(health.json()["status"], "degraded")
+            response = client.post("/v1/search", headers={"X-API-Key": "token"}, json={"query": "example"})
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.json()["detail"], "browser is unavailable")
 
     def test_links_fall_back_to_request_host_when_unset(self):
         with patch("annas_api.jobs.search_books", return_value=[]):
