@@ -154,6 +154,8 @@ def create_app(settings=None):
         }
         if job["status"] == "completed" and job.get("file_path"):
             response["download_url"] = signed_download_url(request, job)
+        elif job["status"] == "running" and job["kind"] == "download":
+            response["transfer_bytes"] = app.state.jobs.transfer_bytes(job["id"])
         return response
 
     def job_summary(request, job):
@@ -168,7 +170,19 @@ def create_app(settings=None):
         }
         if job["status"] == "completed" and job.get("file_path"):
             response["download_url"] = signed_download_url(request, job)
+        elif job["status"] == "running" and job["kind"] == "download":
+            response["transfer_bytes"] = app.state.jobs.transfer_bytes(job["id"])
         return response
+
+    def library_item(request, job):
+        return {
+            "id": job["id"],
+            "name": job["name"],
+            "created_at": job["created_at"],
+            "completed_at": job["updated_at"],
+            "available_until": job["updated_at"] + settings.retention_seconds,
+            "download_url": signed_download_url(request, job),
+        }
 
     @app.get("/healthz")
     def health():
@@ -231,6 +245,16 @@ def create_app(settings=None):
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         items = [job_summary(request, row) for row in rows]
         return {"jobs": items, "count": len(items), "limit": limit, "offset": offset}
+
+    @app.get("/v1/library")
+    def library(request: Request, caller=Depends(identity), jobs=Depends(service)):
+        """Completed downloads for the current account, retained for its file window."""
+        items = [library_item(request, row) for row in jobs.list_library(caller.id)]
+        return {
+            "files": items,
+            "retention_seconds": settings.retention_seconds,
+            "count": len(items),
+        }
 
     @app.get("/v1/jobs/{job_id}")
     def get_job(job_id: str, request: Request, caller=Depends(identity), jobs=Depends(service)):

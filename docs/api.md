@@ -114,6 +114,28 @@ List items omit `result`, so a page never carries a full result set; completed
 downloads still include `download_url`. When `count` equals `limit`, advance by
 adding `limit` to `offset`.
 
+## Library
+
+`GET /v1/library`
+
+Returns only the calling account's completed download files that are still
+retained. Every response contains fresh signed `download_url` values; the
+stored files expire after `ANNAS_API_FILE_RETENTION_HOURS` (24 by default).
+
+```json
+{
+  "files": [{
+    "id": "<job-id>",
+    "name": "Example book",
+    "completed_at": 1790000000,
+    "available_until": 1790086400,
+    "download_url": "https://example.com/v1/files/<job-id>?expires=...&signature=..."
+  }],
+  "retention_seconds": 86400,
+  "count": 1
+}
+```
+
 ## Cancel a job
 
 `POST /v1/jobs/{job_id}/cancel`

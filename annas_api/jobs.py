@@ -315,6 +315,50 @@ class JobService:
             connection.close()
         return [dict(row) for row in rows]
 
+    def list_library(self, owner_id, limit=100):
+        """Return this account's completed downloads that are still on disk.
+
+        Download URLs are deliberately not persisted.  The API issues a fresh
+        short-lived signed URL every time the library is opened.
+        """
+        if owner_id is None:
+            return []
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                "SELECT id, kind, status, file_path, created_at, updated_at, payload_json "
+                "FROM jobs WHERE owner_id = ? AND kind = 'download' AND status = 'completed' "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT ?",
+                (owner_id, limit),
+            ).fetchall()
+        finally:
+            connection.close()
+
+        items = []
+        for row in rows:
+            item = dict(row)
+            try:
+                payload = json.loads(item.pop("payload_json"))
+            except (TypeError, ValueError):
+                payload = {}
+            item["name"] = payload.get("name") or payload.get("md5") or "未命名资源"
+            # A file can disappear between the retention sweep and this query.
+            # Do not advertise stale entries as downloadable.
+            if self.completed_file(item["id"]):
+                items.append(item)
+        return items
+
+    def transfer_bytes(self, job_id):
+        """Best-effort byte count for an active resumable download."""
+        target_dir = (self.download_dir / job_id).resolve()
+        if target_dir.parent != self.download_dir.resolve() or not target_dir.is_dir():
+            return 0
+        return sum(
+            path.stat().st_size
+            for path in target_dir.glob("*.part")
+            if path.is_file()
+        )
+
     def count_active(self, owner_id):
         """Number of queued or running jobs owned by ``owner_id``."""
         connection = self._connect()

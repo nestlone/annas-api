@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import requests
+
 from annas_api.downloader import download, target_path, validate_md5, validate_public_https
 
 
@@ -132,6 +134,15 @@ class DownloadTests(unittest.TestCase):
         ):
             with self.assertRaises(Exception):
                 download(self.URL, self.folder.name, md5=self.md5)
+
+    def test_direct_transfer_retries_and_resumes_without_proxy_pool(self):
+        response = FakeResponse(200, self.DATA, {"Content-Length": str(len(self.DATA))})
+        with patch("annas_api.downloader.validate_public_https"), patch(
+            "annas_api.downloader.checked_get",
+            side_effect=[requests.exceptions.ConnectionError("temporary upstream reset"), response],
+        ), patch("annas_api.downloader.time.sleep"):
+            result = download(self.URL, self.folder.name, md5=self.md5)
+        self.assertEqual(Path(result).read_bytes(), self.DATA)
 
     def test_long_filename_is_truncated_to_budget(self):
         url = "https://example.com/%s.epub" % ("a" * 400)

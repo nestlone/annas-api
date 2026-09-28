@@ -287,6 +287,29 @@ class ApiTests(unittest.TestCase):
                 url = response.json()["download_url"]
                 self.assertTrue(url.startswith("https://annas.example.com/v1/files/"), url)
 
+    def test_library_only_lists_current_account_completed_downloads(self):
+        def fake_download(**kwargs):
+            target = Path(kwargs["output_dir"]) / "book.epub"
+            target.write_bytes(b"content")
+            return str(target)
+
+        with patch("annas_api.jobs.download_book", side_effect=fake_download):
+            with TestClient(create_app(self.settings)) as client:
+                headers = {"X-API-Key": "token"}
+                created = client.post(
+                    "/v1/downloads", headers=headers,
+                    json={"md5": "0" * 32, "name": "Library book"},
+                )
+                self.wait_until_done(client, created.json()["id"])
+                response = client.get("/v1/library", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["files"][0]["name"], "Library book")
+        self.assertEqual(body["retention_seconds"], 24 * 3600)
+        self.assertIn("available_until", body["files"][0])
+        self.assertIn("/v1/files/", body["files"][0]["download_url"])
+
     def test_jobs_list_requires_token(self):
         with TestClient(create_app(self.settings)) as client:
             self.assertEqual(client.get("/v1/jobs").status_code, 401)

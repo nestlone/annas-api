@@ -21,7 +21,8 @@ index, download files with integrity checks, and optionally convert DjVu to PDF.
 - **Resumable transfers** — interrupted downloads resume with byte-range requests.
 - **Proxy routing** — optionally route CDN downloads through a rotating proxy pool.
 - **Bounded concurrency** — a local worker pool (1–10) with FIFO queueing.
-- **Web console** — a built-in page for per-user API keys, online search and download, quotas, and an administrator view for registration and users.
+- **Web console** — a cel-shaded, square-edged console for per-user API keys, online search and download, quotas, and administration.
+- **24-hour library** — each account can revisit verified completed downloads and receive a fresh signed delivery link while the retained file exists.
 - **One-command deploy** — Docker Compose; secrets live in an untracked `.env`.
 
 ## Quick start

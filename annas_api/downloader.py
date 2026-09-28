@@ -149,10 +149,15 @@ def download(url, output_dir, name=None, md5=None, proxy=None, proxy_provider=No
                 break
             except (RetryableTransfer, requests.exceptions.ProxyError,
                     requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
-                if proxy_provider is None or attempt >= retries:
+                # A CDN may drop a long-running stream even when no proxy pool
+                # is configured.  The .part file makes the next attempt safe:
+                # it asks for exactly the missing byte range.  Previously
+                # direct deployments failed immediately in this situation.
+                if attempt >= retries:
                     raise
                 last_error = exc
-                proxy = proxy_provider()
+                if proxy_provider is not None:
+                    proxy = proxy_provider()
                 time.sleep(min(2 ** attempt, 8))
         else:
             raise last_error or RuntimeError("下载重试次数已用尽")

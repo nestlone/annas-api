@@ -1,9 +1,9 @@
 # Web console
 
 The service serves a console at the site root (`/`). It offers per-user API
-keys, online search and download, and — for administrators — registration
-control, user management and quotas. Everything is stored in the same SQLite
-database as the jobs.
+keys, online search and download, a square-edged cel-shaded interface, and —
+for administrators — registration control, user management and quotas.
+Everything is stored in the same SQLite database as the jobs.
 
 ## First start
 
@@ -33,6 +33,7 @@ console value wins afterwards. A registrant is always a regular user.
 | Screen | What it does |
 | --- | --- |
 | **检索 (Search)** | Enter a query, optionally a format and a result count. Each hit has a Download button that queues the file and links it when ready. |
+| **图书馆 (Library)** | Your verified completed downloads. Files remain available for `ANNAS_API_FILE_RETENTION_HOURS` (24 by default); opening the shelf issues a fresh short-lived download link. |
 | **我的任务 (My jobs)** | Recent jobs with status; queued jobs can be cancelled, completed downloads can be saved. |
 | **API 密钥 (API keys)** | Create, rename and revoke keys. The secret is displayed **once** at creation — only its SHA-256 is stored, so it cannot be recovered later. |
 | **我的额度 (My quota)** | Today's search and download counts against the limits, plus jobs currently running. |

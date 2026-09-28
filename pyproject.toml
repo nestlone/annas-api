@@ -46,9 +46,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# httpx backs fastapi.testclient, which the offline API tests import.
+# Current Starlette TestClient loads the renamed httpx2 package.  Keep it in
+# the development extra so a clean test environment can import API tests.
 dev = [
-    "httpx>=0.23.0",
+    "httpx2>=0.1.0",
 ]
 
 [project.urls]

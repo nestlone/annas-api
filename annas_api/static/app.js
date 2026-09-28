@@ -31,6 +31,7 @@ const state = { me: null, settings: null };
 
 const NAV_ICONS = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="m16 16 4.2 4.2"></path></svg>',
+  library: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h5v15H4zM10 3h5v17h-5zM16 7h4v13h-4z"></path><path d="M3 20h18"></path></svg>',
   jobs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l4 4v14H4V3h4"></path><path d="M8 3v5h8V3M8 14h8M8 18h5"></path></svg>',
   keys: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="15.5" r="3.5"></circle><path d="m11 13 8.5-8.5M16 8l2 2M14 10l2 2"></path></svg>',
   usage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-8M22 19V3"></path></svg>',
@@ -56,6 +57,20 @@ function toast(message, kind) {
 function fmtTime(seconds) {
   if (!seconds) return "-";
   return new Date(seconds * 1000).toLocaleString("zh-CN", { hour12: false });
+}
+
+function fmtBytes(bytes) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  return (bytes / Math.pow(1024, index)).toFixed(index ? 1 : 0) + " " + units[index];
+}
+
+function remainingLabel(timestamp) {
+  const seconds = Math.max(0, timestamp - Math.floor(Date.now() / 1000));
+  if (!seconds) return "即将清理";
+  const hours = Math.ceil(seconds / 3600);
+  return hours >= 24 ? "保留约 " + Math.floor(hours / 24) + " 天" : "保留约 " + hours + " 小时";
 }
 
 const STATUS_LABEL = {
@@ -89,6 +104,7 @@ function renderChrome() {
   }
   const links = [
     ["#/search", "检索", "search"],
+    ["#/library", "图书馆", "library"],
     ["#/jobs", "我的任务", "jobs"],
     ["#/keys", "API 密钥", "keys"],
     ["#/usage", "我的额度", "usage"],
@@ -248,7 +264,9 @@ async function startDownload(hit, button) {
   try {
     const created = await API.post("/v1/downloads", { md5: hit.md5, name: hit.title });
     const job = await pollJob(created.id, (current) => {
-      button.textContent = STATUS_LABEL[current.status] || current.status;
+      button.textContent = current.status === "running" && current.transfer_bytes
+        ? "已传输 " + fmtBytes(current.transfer_bytes)
+        : (STATUS_LABEL[current.status] || current.status);
     });
     if (job.status !== "completed") throw new Error(job.error || "下载失败");
     button.textContent = "已就绪";
@@ -261,6 +279,35 @@ async function startDownload(hit, button) {
     button.disabled = false;
     button.textContent = original;
     toast(error.message, "error");
+  }
+}
+
+/* ------------------------------------------------------------------ library */
+
+async function screenLibrary() {
+  view().innerHTML =
+    '<section class="library-hero">' +
+      '<div><p class="eyebrow">YOUR SHELF · 24H ARCHIVE</p><h1>图书馆</h1>' +
+      '<p>已验证完成的下载会保留 24 小时。每次打开此页都会生成新的安全下载链接。</p></div>' +
+      '<div class="library-stamp">24<br><small>HOURS</small></div>' +
+    '</section><div id="library-body" class="library-grid"><p class="hint">正在整理书架…</p></div>';
+  const body = document.getElementById("library-body");
+  try {
+    const data = await API.get("/v1/library");
+    if (!data.files.length) {
+      body.innerHTML = '<div class="empty-shelf"><span aria-hidden="true">▱</span><h2>书架还是空的</h2><p>在检索结果中完成下载后，资源会出现在这里。</p><a class="button-link" href="#/search">去检索</a></div>';
+      return;
+    }
+    body.innerHTML = data.files.map((file, index) =>
+      '<article class="book-card">' +
+        '<div class="book-spine"><span>' + String(index + 1).padStart(2, "0") + '</span><b>ANNAS<br>ARCHIVE</b></div>' +
+        '<div class="book-info"><p class="eyebrow">READY TO READ</p><h2>' + esc(file.name) + '</h2>' +
+        '<p class="hint">完成于 ' + esc(fmtTime(file.completed_at)) + ' · ' + esc(remainingLabel(file.available_until)) + '</p>' +
+        '<a class="button-link" href="' + esc(file.download_url) + '">再次下载 <span aria-hidden="true">↘</span></a></div>' +
+      '</article>'
+    ).join("");
+  } catch (error) {
+    body.innerHTML = '<p class="hint">' + esc(error.message) + "</p>";
   }
 }
 
@@ -289,6 +336,7 @@ async function loadJobs() {
       data.jobs.map((job) =>
         "<tr><td>" + (job.kind === "search" ? "检索" : "下载") + "</td><td>" +
         statusBadge(job.status) + "</td><td>" + esc(fmtTime(job.created_at)) +
+        (job.status === "running" && job.transfer_bytes ? '<br><small class="hint">已传输 ' + esc(fmtBytes(job.transfer_bytes)) + "</small>" : "") +
         '</td><td class="right">' +
         (job.status === "queued" ? '<button class="ghost" data-cancel="' + esc(job.id) + '">取消</button>' : "") +
         (job.download_url ? '<a class="download-link" href="' + esc(job.download_url) + '">下载文件</a>' : "") +
@@ -580,6 +628,7 @@ async function loadUsers() {
 
 const ROUTES = {
   "#/search": screenSearch,
+  "#/library": screenLibrary,
   "#/jobs": screenJobs,
   "#/keys": screenKeys,
   "#/usage": screenUsage,
