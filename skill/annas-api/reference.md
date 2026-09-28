@@ -8,6 +8,10 @@ Every endpoint requires an API key unless noted:
 X-API-Key: <ANNAS_API_TOKEN>
 ```
 
+A deployment may issue per-user keys from its web console. They behave the same
+way; the only difference is visibility — a regular user's key reaches that
+user's own jobs, while an administrative key sees every job.
+
 Requests and responses are JSON (`Content-Type: application/json`). Errors use
 the FastAPI shape `{"detail": "<message>"}`.
 

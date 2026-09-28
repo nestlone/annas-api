@@ -10,7 +10,7 @@ description: >-
   default deployment is https://annas.nestlone.com.
 license: MIT
 metadata:
-  version: "1.0.3"
+  version: "1.0.4"
   service: annas.nestlone.com
   api-contract: v1
 ---

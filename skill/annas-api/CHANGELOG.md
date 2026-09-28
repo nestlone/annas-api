@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-09-28
+
+### Changed
+
+- `reference.md` records that a deployment may issue per-user API keys from its
+  web console. They authenticate identically; the only difference is visibility,
+  since a regular user's key reaches that user's own jobs while an administrative
+  key sees every job.
+
 ## [1.0.3] - 2026-09-28
 
 ### Fixed
@@ -64,7 +73,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `skill-v*` GitHub release and reports whether an update is available.
 - `tests/test_client.py` — offline tests backed by a standard-library HTTP stub.
 
-[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.3...HEAD
+[Unreleased]: https://github.com/nestlone/annas-api/compare/skill-v1.0.4...HEAD
+[1.0.4]: https://github.com/nestlone/annas-api/compare/skill-v1.0.3...skill-v1.0.4
 [1.0.3]: https://github.com/nestlone/annas-api/compare/skill-v1.0.2...skill-v1.0.3
 [1.0.2]: https://github.com/nestlone/annas-api/compare/skill-v1.0.1...skill-v1.0.2
 [1.0.1]: https://github.com/nestlone/annas-api/compare/skill-v1.0.0...skill-v1.0.1

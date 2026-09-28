@@ -37,7 +37,7 @@ the repository's "latest release". Install a pinned version — the archive
 contains a top-level `annas-api/` folder:
 
 ```bash
-VERSION=1.0.3
+VERSION=1.0.4
 BASE=https://github.com/nestlone/annas-api/releases/download/skill-v$VERSION
 curl -L -o "annas-api-skill-$VERSION.zip" "$BASE/annas-api-skill-$VERSION.zip"
 curl -L -o "annas-api-skill-$VERSION.zip.sha256" "$BASE/annas-api-skill-$VERSION.zip.sha256"

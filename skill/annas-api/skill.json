@@ -1,6 +1,6 @@
 {
   "name": "annas-api",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Asynchronous search and verified-download jobs against an annas-api deployment.",
   "license": "MIT",
   "entrypoints": {
