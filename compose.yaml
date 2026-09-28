@@ -2,19 +2,19 @@ name: annas-api
 
 services:
   annas-api:
+    image: annas-api:local
     build:
       context: .
       args:
         PIP_INDEX_URL: ${ANNAS_API_PIP_INDEX_URL:-https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple}
         DEBIAN_MIRROR_URL: ${ANNAS_API_DEBIAN_MIRROR_URL:-https://mirrors.tuna.tsinghua.edu.cn/debian}
-        PLAYWRIGHT_DOWNLOAD_HOST: ${ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST:-}
-        PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: ${ANNAS_API_PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT:-120000}
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
       - .env
     volumes:
       - ./annas_api:/app/annas_api:ro
+      - ./playwright-browsers:/ms-playwright:ro
       - annas-api-data:/data
     networks:
       annas-api-net:

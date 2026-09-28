@@ -51,12 +51,20 @@ the service is running:
 | --- | --- | --- |
 | `ANNAS_API_PIP_INDEX_URL` | Tsinghua PyPI mirror | Python package index used by `pip`. |
 | `ANNAS_API_DEBIAN_MIRROR_URL` | Tsinghua Debian mirror | Main Debian package source used for Playwright system dependencies. Debian security updates remain official. |
-| `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` | empty | Optional trusted Playwright browser-artifact repository. Empty uses the official CDN. |
-| `ANNAS_API_PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT` | `120000` | Browser-download connection timeout in milliseconds. |
 
 Changing any of these values requires `docker compose up --build -d`.
 Docker Hub registry mirrors are configured in the host Docker daemon rather than
 in this project; use only an organization-approved registry mirror.
+
+## Playwright browser files
+
+The image installs Chromium's system dependencies but does not download browser
+binaries. Compose mounts `./playwright-browsers` read-only at `/ms-playwright`.
+Download the browser through the matching `annas-api:local` image on a Linux
+x86_64 machine, archive that directory, and extract it into the project
+directory on the deployment host. The quick-start guide contains the exact
+commands. Do not mix browser directories from a different platform or
+Playwright version.
 
 ## Accounts and the web console
 

@@ -44,9 +44,33 @@ downloads from mainland China. Set `ANNAS_API_PIP_INDEX_URL` in `.env` before
 rebuilding to use another index. Playwright uses the Tsinghua Debian mirror for
 system dependencies by default; set `ANNAS_API_DEBIAN_MIRROR_URL` to override
 it. Debian security updates remain on the official source. Slow browser-binary
-downloads use Playwright's official CDN with a 120-second connection timeout.
-Set `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` only for a trusted Playwright artifact
-repository; do not make an unknown third-party browser-binary mirror the default.
+downloads are not performed during the image build. Browser files are mounted
+read-only from the server's `playwright-browsers/` directory; see the offline
+browser import instructions below.
+
+### Offline browser import
+
+On a machine with fast network access and Linux x86_64 Docker, build the same
+commit and download its browser files:
+
+```bash
+docker compose build
+mkdir -p playwright-browsers
+docker run --rm -v "$PWD/playwright-browsers:/ms-playwright" \
+  annas-api:local python -m playwright install chromium
+tar -C playwright-browsers -czf playwright-browsers-linux-x64.tar.gz .
+```
+
+Upload the archive to the server's project directory, extract it, and start:
+
+```bash
+mkdir -p playwright-browsers
+tar -xzf playwright-browsers-linux-x64.tar.gz -C playwright-browsers
+docker compose up --build -d
+```
+
+Browser files must be downloaded by the matching project image on Linux x86_64.
+Do not mix files from Windows, macOS, or another Playwright version.
 
 Then open `http://127.0.0.1:8000/` for the web console and log in with
 `ANNAS_API_ADMIN_USERNAME` / `ANNAS_API_ADMIN_PASSWORD` — see [Web console](docs/web.md).

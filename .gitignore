@@ -65,6 +65,7 @@ coverage.xml
 temp/
 tmp/
 work/
+playwright-browsers/
 *.log
 
 # IDE & Editor files

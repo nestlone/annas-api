@@ -40,9 +40,31 @@ Docker 构建默认通过清华 PyPI 镜像安装 Python 依赖，以改善中�
 如需使用其他镜像，可在 `.env` 中设置 `ANNAS_API_PIP_INDEX_URL` 后重新构建。
 Playwright 安装系统依赖时默认使用清华 Debian 镜像，可通过
 `ANNAS_API_DEBIAN_MIRROR_URL` 覆盖；Debian 安全更新保持使用官方源。浏览器二进制
-下载默认使用 Playwright 官方 CDN，并将连接超时设为 120 秒。若企业已有可信的
-Playwright 制品仓库，可通过 `ANNAS_API_PLAYWRIGHT_DOWNLOAD_HOST` 指定；不要将
-未知的第三方浏览器二进制镜像设为默认源。
+不在镜像构建期间下载，而是从服务器的 `playwright-browsers/` 目录只读挂载。
+下载与上传流程见下文的“浏览器文件离线导入”。
+
+### 浏览器文件离线导入
+
+在网络较快、Linux x86_64 Docker 可用的机器上，以相同提交构建镜像后下载浏览器：
+
+```bash
+docker compose build
+mkdir -p playwright-browsers
+docker run --rm -v "$PWD/playwright-browsers:/ms-playwright" \
+  annas-api:local python -m playwright install chromium
+tar -C playwright-browsers -czf playwright-browsers-linux-x64.tar.gz .
+```
+
+将压缩包上传到服务器项目目录后解压，再启动服务：
+
+```bash
+mkdir -p playwright-browsers
+tar -xzf playwright-browsers-linux-x64.tar.gz -C playwright-browsers
+docker compose up --build -d
+```
+
+浏览器文件必须由 Linux x86_64 环境、相同项目提交对应的镜像下载；不要混用 Windows、
+macOS 或不同 Playwright 版本的文件。
 
 随后打开 <http://127.0.0.1:8000/> 进入 Web 控制台，用 `ANNAS_API_ADMIN_USERNAME` /
 `ANNAS_API_ADMIN_PASSWORD` 登录——详见 [Web 控制台](docs/web.md)。
