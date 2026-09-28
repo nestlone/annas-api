@@ -26,6 +26,7 @@ from .config import (
     ensure_user_dirs,
     CACHE_DIR,
 )
+from .browser import fallback_chromium_executable
 from .proxy_pool import get_pool
 
 # Defensive UTF-8 console output on Windows
@@ -149,6 +150,26 @@ def detect_browser_channel():
             if shutil.which(b):
                 return "chrome"
     return None
+
+
+def browser_launch_args():
+    """Build a Chromium launch configuration for both full and slim installs."""
+    launch_args = {
+        "headless": CONFIG.get("headless", True),
+        "args": ["--disable-blink-features=AutomationControlled"],
+    }
+    browser_ch = detect_browser_channel()
+    if browser_ch:
+        launch_args["channel"] = browser_ch
+    elif CONFIG.get("headless", True):
+        # New Playwright releases prefer chromium_headless_shell. A manually
+        # imported full Chromium archive is equally capable of headless mode,
+        # so use it rather than failing solely because the optional shell was
+        # omitted from an otherwise valid browser upload.
+        fallback = fallback_chromium_executable()
+        if fallback:
+            launch_args["executable_path"] = str(fallback)
+    return launch_args
 
 def find_djvu_tool():
     """Finds ddjvu executable for lossless DjVu-to-PDF transcoding."""
@@ -337,14 +358,7 @@ def search_books(query, ext=None, limit=10, as_json=False):
 
     mirror = get_active_mirror()
     proxy_server = resolve_proxy(mirror, browser=True)
-    browser_ch = detect_browser_channel()
-
-    launch_args = {
-        "headless": CONFIG.get("headless", True),
-        "args": ["--disable-blink-features=AutomationControlled"]
-    }
-    if browser_ch:
-        launch_args["channel"] = browser_ch
+    launch_args = browser_launch_args()
     if proxy_server:
         launch_args["proxy"] = {"server": proxy_server}
 
@@ -468,16 +482,10 @@ def resolve_direct_url(md5, quiet=False, proxy=_UNSET):
     from playwright.sync_api import sync_playwright
     import ddddocr
     ocr = ddddocr.DdddOcr(show_ad=False)
-    browser_ch = detect_browser_channel()
     mirror = get_active_mirror()
     proxy_server = resolve_proxy(mirror, browser=True) if proxy is _UNSET else proxy
 
-    launch_args = {
-        "headless": CONFIG.get("headless", True),
-        "args": ["--disable-blink-features=AutomationControlled"]
-    }
-    if browser_ch:
-        launch_args["channel"] = browser_ch
+    launch_args = browser_launch_args()
     if proxy_server:
         launch_args["proxy"] = {"server": proxy_server}
 

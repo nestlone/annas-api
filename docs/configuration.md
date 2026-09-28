@@ -64,14 +64,16 @@ Download the browser through the matching `annas-api:local` image on a Linux
 x86_64 machine, archive that directory, and extract it into the project
 directory on the deployment host. The quick-start guide contains the exact
 commands. Do not mix browser directories from a different platform or
-Playwright version. The upload must include both `chromium-<revision>` and
-`chromium_headless_shell-<revision>`; Chrome's browser archive alone is not
-enough for normal headless execution.
+Playwright version. Upload the whole generated directory when possible. A
+complete `chromium-<revision>` directory is also sufficient: when the optional
+`chromium_headless_shell-<revision>` is not present, annas-api automatically
+launches the full Chromium executable in headless mode.
 
-On startup the service validates the headless-shell executable. If it is absent,
-`GET /healthz` returns `503` with an actionable message and browser-dependent
-searches (and MD5-based downloads) are rejected before they consume quota. A
-direct-URL download does not require Playwright and remains available.
+On startup the service validates that at least one compatible Chromium executable
+is available. Otherwise, `GET /healthz` returns `503` with an actionable message
+and browser-dependent searches (and MD5-based downloads) are rejected before they
+consume quota. A direct-URL download does not require Playwright and remains
+available.
 
 ## Accounts and the web console
 

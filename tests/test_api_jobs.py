@@ -9,6 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from annas_api.api import create_app
+from annas_api.browser import fallback_chromium_executable
 from annas_api.jobs import BrowserUnavailable, JobService
 
 
@@ -43,6 +44,15 @@ class JobServiceTests(unittest.TestCase):
             job = self.wait_for(job_id)
         self.assertEqual(job["status"], "completed")
         self.assertEqual(job["result"], [{"title": "Example"}])
+
+    def test_full_chromium_is_accepted_as_a_headless_fallback(self):
+        browser_root = Path(self.folder.name) / "browsers"
+        executable = browser_root / "chromium-1243" / "chrome-linux64" / "chrome"
+        executable.parent.mkdir(parents=True)
+        executable.write_text("#!/bin/sh\n")
+        executable.chmod(executable.stat().st_mode | 0o111)
+        with patch.dict("os.environ", {"PLAYWRIGHT_BROWSERS_PATH": str(browser_root)}):
+            self.assertEqual(fallback_chromium_executable(), executable)
 
     def test_browser_dependent_jobs_are_rejected_before_queueing(self):
         self.jobs.browser_error = "browser is unavailable"
