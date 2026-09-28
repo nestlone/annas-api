@@ -170,7 +170,8 @@ Signed delivery for a completed download. **No API key is required** — the
 | `expires` | Unix timestamp when the link stops working. |
 | `signature` | HMAC-SHA256 over `"{job_id}:{expires}"`. |
 
-- `200` — file bytes, with a `Content-Disposition` filename.
+- `200` — file bytes, with the real name in `Content-Disposition` (RFC 5987
+  `filename*=utf-8''…`).
 - `403` — missing, malformed, or expired signature.
 - `404` — the job is unknown or not complete.
 
@@ -221,7 +222,7 @@ window elapses (24 hours by default), after which lookups return `404`.
 | `cancel(job_id)` | `POST /v1/jobs/{id}/cancel` |
 | `wait(job_id, timeout=600, interval=1.0)` | poll to a terminal state |
 | `run_search(...)` / `run_download(...)` | submit + wait |
-| `fetch(url)` / `save(url, dest)` | signed file delivery |
+| `fetch(url)` / `save(url, dest)` | signed file delivery; `save` uses the response filename when `dest` is a directory |
 | `run_search_to_file(query, dest, ...)` | search → download → save |
 
 Failures raise `AnnasApiError`, whose `status` attribute carries the HTTP code

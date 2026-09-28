@@ -28,7 +28,7 @@ import os
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request, urlopen
 
 DEFAULT_BASE_URL = "https://annas.nestlone.com"
@@ -67,15 +67,41 @@ def _describe(status, raw):
     return text[:300] or "HTTP {}".format(status)
 
 
+def _safe_filename(name):
+    """Reduce a server-supplied filename to a bare name, or return ``None``.
+
+    The name comes from a response header, so it is untrusted: dropping any
+    directory component keeps a malicious ``../../x`` from escaping the target
+    directory.
+    """
+    if not name:
+        return None
+    candidate = name.replace("\\", "/").split("/")[-1].strip()
+    if not candidate or candidate in (".", ".."):
+        return None
+    return candidate
+
+
 def _filename_from_headers(headers):
+    """Read the filename from ``Content-Disposition``, preferring RFC 5987.
+
+    The service sends ``filename*=utf-8''<percent-encoded>``; older senders use
+    a quoted ``filename=``. Either may be absent.
+    """
     disposition = headers.get("Content-Disposition") or headers.get("content-disposition")
     if not disposition:
         return None
+    extended = plain = None
     for part in disposition.split(";"):
-        part = part.strip()
-        if part.lower().startswith("filename="):
-            return part.split("=", 1)[1].strip().strip('"')
-    return None
+        name, _, value = part.strip().partition("=")
+        name = name.strip().lower()
+        value = value.strip()
+        if name == "filename*":
+            pieces = value.split("'")
+            extended = unquote(pieces[2] if len(pieces) >= 3 else value)
+        elif name == "filename":
+            plain = value.strip('"')
+    return _safe_filename(extended) or _safe_filename(plain)
 
 
 class AnnasClient:

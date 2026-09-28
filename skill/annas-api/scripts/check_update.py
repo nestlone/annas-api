@@ -56,7 +56,7 @@ def skill_root():
 
 
 def read_local_version(root=None):
-    version_file = (root or skill_root()) / "VERSION"
+    version_file = Path(root) / "VERSION" if root else skill_root() / "VERSION"
     try:
         version = version_file.read_text(encoding="utf-8").strip()
     except OSError as exc:

@@ -54,6 +54,14 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_file(self, disposition):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/epub+zip")
+        self.send_header("Content-Disposition", disposition)
+        self.send_header("Content-Length", str(len(FILE_BYTES)))
+        self.end_headers()
+        self.wfile.write(FILE_BYTES)
+
     def _send_bytes(self, status, body):
         self.send_response(status)
         self.send_header("Content-Type", "text/plain")
@@ -106,17 +114,19 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_bytes(200, b"9.9.9\n")
         if path == "/VERSION-garbage":
             return self._send_bytes(200, b"not-a-version\n")
+        if path == "/file-rfc5987":
+            return self._send_file("attachment; filename*=utf-8''The%20Great%20Gatsby.epub")
+        if path == "/file-traversal":
+            return self._send_file("attachment; filename*=utf-8''..%2F..%2Fevil.epub")
+        if path == "/file-quoted":
+            return self._send_file('attachment; filename="plain name.epub"')
+
         if path.startswith("/v1/files/"):
             job_id = path.rsplit("/", 1)[-1]
             job = _Handler.jobs.get(job_id) or {}
             if job.get("status") != "completed":
                 return self._send_json(404, {"detail": "文件不存在或任务未完成"})
-            self.send_response(200)
-            self.send_header("Content-Type", "application/epub+zip")
-            self.send_header("Content-Disposition", 'attachment; filename="stub.epub"')
-            self.send_header("Content-Length", str(len(FILE_BYTES)))
-            self.end_headers()
-            return self.wfile.write(FILE_BYTES)
+            return self._send_file('attachment; filename="stub.epub"')
 
         if not path.startswith("/v1/"):
             return self._send_json(404, {"detail": "not found"})
@@ -291,6 +301,22 @@ class ClientTests(StubServerCase):
             self.client.cancel("nope")
         self.assertEqual(ctx.exception.status, 404)
 
+    def test_save_decodes_an_rfc5987_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            written = self.client.save(self.base + "/file-rfc5987", tmp)
+        self.assertEqual(written.name, "The Great Gatsby.epub")
+
+    def test_save_falls_back_to_a_quoted_filename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            written = self.client.save(self.base + "/file-quoted", tmp)
+        self.assertEqual(written.name, "plain name.epub")
+
+    def test_save_cannot_escape_the_target_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            written = self.client.save(self.base + "/file-traversal", tmp)
+            self.assertEqual(written.name, "evil.epub")
+            self.assertEqual(Path(tmp), written.parent)
+
 
 class UpdateCheckTests(StubServerCase):
     def test_compare_versions_orders_release_and_prerelease(self):
@@ -306,6 +332,11 @@ class UpdateCheckTests(StubServerCase):
 
     def test_local_version_is_readable(self):
         self.assertRegex(check_update.read_local_version(), r"^\d+\.\d+\.\d+")
+
+    def test_local_version_accepts_a_string_root(self):
+        root = str(SCRIPTS.parent)
+        self.assertEqual(check_update.read_local_version(root),
+                         check_update.read_local_version(SCRIPTS.parent))
 
     def test_newest_release_ignores_foreign_tags(self):
         releases = [
