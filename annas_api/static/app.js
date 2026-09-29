@@ -248,7 +248,7 @@ function renderSearchResults(hits) {
   node.innerHTML = '<div class="result-grid">' + hits.map((hit, index) =>
     '<article class="result-card"><div class="result-index">' + String(index + 1).padStart(2, "0") +
     '</div><div class="result-copy"><h2>' + esc(hit.title || hit.md5) + '</h2><p><span>' + esc(hit.format || "未知格式") +
-    '</span><span>' + esc(hit.size || "大小未知") + '</span></p></div><button data-index="' + index +
+    '</span><span>' + esc(hit.size || "来源未提供大小") + '</span></p></div><button data-index="' + index +
     '" class="ghost">加入下载</button></article>').join("") + "</div>";
   node.querySelectorAll("button[data-index]").forEach((button) => {
     button.onclick = () => startDownload(hits[Number(button.dataset.index)], button);
@@ -333,9 +333,10 @@ async function loadJobs() {
       return;
     }
     body.innerHTML =
-      '<table><thead><tr><th>类型</th><th>状态</th><th>创建时间</th><th></th></tr></thead><tbody>' +
+      '<table><thead><tr><th>任务 ID</th><th>类型</th><th>状态</th><th>创建时间</th><th></th></tr></thead><tbody>' +
       data.jobs.map((job) =>
-        "<tr><td>" + (job.kind === "search" ? "检索" : "下载") + "</td><td>" +
+        '<tr><td><code class="job-id" title="' + esc(job.id) + '">' + esc(job.id) + "</code></td><td>" +
+        (job.kind === "search" ? "检索" : "下载") + "</td><td>" +
         statusBadge(job.status) + "</td><td>" + esc(fmtTime(job.created_at)) +
         (job.status === "running" && job.transfer_bytes ? '<br><small class="hint">已传输 ' + esc(fmtBytes(job.transfer_bytes)) + "</small>" : "") +
         '</td><td class="right">' +

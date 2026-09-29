@@ -418,8 +418,13 @@ def search_books(query, ext=None, limit=10, as_json=False):
 
         fmt_match = re.search(r'\b(pdf|djvu|epub|mobi|azw3)\b', meta_info, re.IGNORECASE)
         fmt = fmt_match.group(1).upper() if fmt_match else "UNKNOWN"
-        size_match = re.search(r'([\d\.]+\s*(?:MB|KB|GB))', meta_info, re.IGNORECASE)
-        size_str = size_match.group(1) if size_match else "未知大小"
+        # Catalog entries are inconsistent: some use MB, others MiB/KiB or a
+        # raw byte count.  Preserve a supplied value rather than marking it
+        # unknown merely because its unit spelling differs.
+        size_match = re.search(
+            r'(\d+(?:[.,]\d+)?\s*(?:[KMGT]i?B|bytes?))', meta_info, re.IGNORECASE
+        )
+        size_str = size_match.group(1) if size_match else "来源未提供大小"
 
         results.append({
             "index": len(results) + 1,
