@@ -367,6 +367,14 @@ async function screenKeys() {
     '<div class="card">' +
     "<h1>API 密钥</h1>" +
     '<p class="hint">密钥只在创建时显示一次，请立即保存。调用接口时放在 <code>X-API-Key</code> 请求头。</p>' +
+    '<section class="skill-download" aria-labelledby="skill-download-title">' +
+    '<div>' +
+    '<p class="eyebrow">CODEX SKILL</p>' +
+    '<h2 id="skill-download-title">下载 annas-api Skill</h2>' +
+    '<p>下载并解压最新版 Skill，再使用本页创建的 API 密钥完成配置。</p>' +
+    '</div>' +
+    '<a class="button-link" href="https://github.com/nestlone/annas-api/releases/latest/download/annas-api-skill.zip" target="_blank" rel="noopener noreferrer">下载最新 Skill ↗</a>' +
+    '</section>' +
     '<form id="key-form" class="row">' +
     '<input name="name" placeholder="备注（可选）">' +
     '<button type="submit">新建密钥</button>' +
