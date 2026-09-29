@@ -491,10 +491,10 @@ async function screenAdmin() {
   if (!state.me || !state.me.is_admin) { location.hash = "#/search"; return; }
   view().innerHTML =
     '<div class="card">' +
-    "<h1>管理后台</h1>" +
-    '<div class="row spread"><label class="switch"><input type="checkbox" id="reg"> 开放注册</label>' +
+    '<div class="screen-heading"><div><p class="eyebrow">ADMINISTRATION</p><h1>管理后台</h1><p class="hint">管理注册、用户权限、密码与配额。账户和额度分别保存，避免误操作。</p></div><span class="heading-tag">ADMIN</span></div>' +
+    '<div class="admin-overview"><label class="switch"><input type="checkbox" id="reg"> 开放注册</label>' +
     '<span class="hint" id="user-count"></span></div>' +
-    '<hr><form id="new-user" class="row">' +
+    '<hr><h2>新建用户</h2><form id="new-user" class="admin-create-form">' +
     '<input name="username" placeholder="用户名" required>' +
     '<input name="password" type="password" placeholder="密码" required>' +
     '<label class="switch"><input type="checkbox" name="is_admin"> 管理员</label>' +
@@ -537,36 +537,28 @@ async function loadUsers() {
   const body = document.getElementById("users-body");
   const data = await API.get("/web/admin/users?limit=200");
   body.innerHTML =
-    '<table><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>今日检索</th><th>今日下载</th>' +
-    "<th>检索额度</th><th>下载额度</th><th>并发</th><th></th></tr></thead><tbody>" +
+    '<div class="admin-user-list">' +
     data.users.map((user) => {
       const quota = user.quota || {};
       const usage = user.usage || {};
       return (
-        '<tr data-user="' + user.id + '">' +
-        '<td><input class="tiny user-name" value="' + esc(user.username) + '" aria-label="用户名"></td>' +
-        '<td><label class="switch"><input type="checkbox" data-admin ' + (user.is_admin ? "checked" : "") + '> 管理员</label></td>' +
-        "<td>" + (user.is_active ? "启用" : "停用") + "</td>" +
-        "<td>" + (usage.searches || 0) + "</td>" +
-        "<td>" + (usage.downloads || 0) + "</td>" +
-        '<td><input class="tiny" data-quota="daily_searches" type="number" min="0" value="' + (quota.daily_searches || 0) + '"></td>' +
-        '<td><input class="tiny" data-quota="daily_downloads" type="number" min="0" value="' + (quota.daily_downloads || 0) + '"></td>' +
-        '<td><input class="tiny" data-quota="max_concurrent_jobs" type="number" min="0" value="' + (quota.max_concurrent_jobs || 0) + '"></td>' +
-        '<td class="right nowrap">' +
-        '<button class="ghost" data-save-user>保存账户</button> ' +
-        '<button class="ghost" data-save>保存额度</button> ' +
-        '<button class="ghost" data-toggle>' + (user.is_active ? "停用" : "启用") + "</button> " +
-        '<input class="tiny reset-password" type="password" placeholder="新密码" aria-label="重置密码"> ' +
-        '<button class="ghost" data-reset-password>重置密码</button> ' +
-        '<button class="ghost" data-reset>重置用量</button> ' +
-        '<button class="ghost danger" data-delete>删除</button>' +
-        "</td></tr>"
+        '<article class="admin-user-card" data-user="' + user.id + '" data-active="' + (user.is_active ? "1" : "0") + '">' +
+        '<header><div><p class="eyebrow">USER #' + user.id + '</p><input class="user-name" value="' + esc(user.username) + '" aria-label="用户名"></div>' +
+        '<div class="user-flags"><span class="badge ' + (user.is_active ? "badge-completed" : "badge-failed") + '">' + (user.is_active ? "启用" : "停用") + '</span>' +
+        '<label class="switch"><input type="checkbox" data-admin ' + (user.is_admin ? "checked" : "") + '> 管理员</label></div></header>' +
+        '<div class="admin-user-sections"><section><h3>今日用量</h3><dl><div><dt>检索</dt><dd>' + (usage.searches || 0) + '</dd></div><div><dt>下载</dt><dd>' + (usage.downloads || 0) + '</dd></div></dl><button class="ghost" data-reset>重置今日用量</button></section>' +
+        '<section><h3>配额设置 <small>0 = 不限制</small></h3><div class="quota-inputs">' +
+        '<label>检索<input data-quota="daily_searches" type="number" min="0" value="' + (quota.daily_searches || 0) + '"></label>' +
+        '<label>下载<input data-quota="daily_downloads" type="number" min="0" value="' + (quota.daily_downloads || 0) + '"></label>' +
+        '<label>并发<input data-quota="max_concurrent_jobs" type="number" min="0" value="' + (quota.max_concurrent_jobs || 0) + '"></label></div><button class="ghost" data-save>保存配额</button></section>' +
+        '<section><h3>账户操作</h3><div class="account-actions"><button class="ghost" data-save-user>保存账户</button><button class="ghost" data-toggle>' + (user.is_active ? "停用账户" : "启用账户") + '</button><button class="ghost danger" data-delete>删除账户</button></div>' +
+        '<label class="password-reset">重置密码<input class="reset-password" type="password" placeholder="输入至少 8 位的新密码" aria-label="重置密码"><button class="ghost" data-reset-password>重置密码</button></label></section></div></article>'
       );
     }).join("") +
-    "</tbody></table>" +
+    "</div>" +
     '<p class="hint">额度为 0 表示不限制；“重置用量”清零该用户今日的检索/下载计数。</p>';
 
-  body.querySelectorAll("tr[data-user]").forEach((row) => {
+  body.querySelectorAll(".admin-user-card[data-user]").forEach((row) => {
     const userId = row.dataset.user;
     const readQuota = () => {
       const values = {};
@@ -592,7 +584,7 @@ async function loadUsers() {
       } catch (error) { toast(error.message, "error"); }
     };
     row.querySelector("[data-toggle]").onclick = async () => {
-      const active = row.children[2].textContent === "启用";
+      const active = row.dataset.active === "1";
       try {
         await API.patch("/web/admin/users/" + userId, { is_active: !active });
         loadUsers();
