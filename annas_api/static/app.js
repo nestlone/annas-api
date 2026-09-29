@@ -545,8 +545,8 @@ async function loadUsers() {
         '<article class="admin-user-card" data-user="' + user.id + '" data-active="' + (user.is_active ? "1" : "0") + '">' +
         '<header><div><p class="eyebrow">USER #' + user.id + '</p><input class="user-name" value="' + esc(user.username) + '" aria-label="用户名"></div>' +
         '<div class="user-flags"><span class="badge ' + (user.is_active ? "badge-completed" : "badge-failed") + '">' + (user.is_active ? "启用" : "停用") + '</span>' +
-        '<label class="switch"><input type="checkbox" data-admin ' + (user.is_admin ? "checked" : "") + '> 管理员</label></div></header>' +
-        '<div class="admin-user-sections"><section><h3>今日用量</h3><dl><div><dt>检索</dt><dd>' + (usage.searches || 0) + '</dd></div><div><dt>下载</dt><dd>' + (usage.downloads || 0) + '</dd></div></dl><button class="ghost" data-reset>重置今日用量</button></section>' +
+        '<span class="role-label">' + (user.is_admin ? "管理员" : "普通用户") + '</span><button class="ghost admin-expand" type="button" aria-expanded="false">展开管理 <span aria-hidden="true">↓</span></button></div></header>' +
+        '<div class="admin-user-sections" hidden><section><h3>今日用量</h3><dl><div><dt>检索</dt><dd>' + (usage.searches || 0) + '</dd></div><div><dt>下载</dt><dd>' + (usage.downloads || 0) + '</dd></div></dl><button class="ghost" data-reset>重置今日用量</button></section>' +
         '<section><h3>配额设置 <small>0 = 不限制</small></h3><div class="quota-inputs">' +
         '<label>检索<input data-quota="daily_searches" type="number" min="0" value="' + (quota.daily_searches || 0) + '"></label>' +
         '<label>下载<input data-quota="daily_downloads" type="number" min="0" value="' + (quota.daily_downloads || 0) + '"></label>' +
@@ -560,6 +560,14 @@ async function loadUsers() {
 
   body.querySelectorAll(".admin-user-card[data-user]").forEach((row) => {
     const userId = row.dataset.user;
+    const expand = row.querySelector(".admin-expand");
+    expand.onclick = () => {
+      const detail = row.querySelector(".admin-user-sections");
+      const isOpen = !detail.hidden;
+      detail.hidden = isOpen;
+      expand.setAttribute("aria-expanded", String(!isOpen));
+      expand.innerHTML = (isOpen ? "展开管理" : "收起管理") + ' <span aria-hidden="true">' + (isOpen ? "↓" : "↑") + "</span>";
+    };
     const readQuota = () => {
       const values = {};
       row.querySelectorAll("input[data-quota]").forEach((input) => {
